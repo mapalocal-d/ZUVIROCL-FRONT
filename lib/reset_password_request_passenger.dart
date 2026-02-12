@@ -27,7 +27,7 @@ class _ResetPasswordRequestPassengerScreenState
     });
 
     final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/auth/reset-password/request-passenger',
+      'https://graceful-balance-production-ef1d.up.railway.app/auth/reset-password/request/passenger',
     );
     try {
       final resp = await http.post(
