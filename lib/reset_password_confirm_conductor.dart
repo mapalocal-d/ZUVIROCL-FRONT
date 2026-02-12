@@ -36,7 +36,7 @@ class _ResetPasswordConfirmConductorScreenState
     });
 
     final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/auth/reset-password/confirm-conductor',
+      'https://graceful-balance-production-ef1d.up.railway.app/auth/reset-password/confirm/conductor',
     );
 
     try {
