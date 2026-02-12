@@ -1,0 +1,229 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:logger/logger.dart';
+
+final logger = Logger();
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  bool _loading = false;
+  String? _error;
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    FocusScope.of(context).unfocus(); // Quitar teclado
+
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final url = Uri.parse(
+      'https://graceful-balance-production-ef1d.up.railway.app/login',
+    );
+
+    try {
+      final resp = await http.post(
+        url,
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: {
+          "username": _emailController.text.trim(),
+          "password": _passwordController.text,
+        },
+      );
+
+      logger.i('STATUS: ${resp.statusCode}');
+      logger.i('BODY: ${resp.body}');
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+
+        // ===== GUARDAR EL TOKEN EN DISCO =====
+        final accessToken = data['access_token'];
+        if (accessToken != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('access_token', accessToken);
+        } else {
+          setState(() {
+            _error = "Login exitoso pero token no recibido.";
+          });
+          return;
+        }
+
+        // Limpiar campos tras login exitoso
+        _emailController.clear();
+        _passwordController.clear();
+
+        // Avisa éxito y navega a dashboard
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Login exitoso'),
+            content: data['user_data']?['email'] != null
+                ? Text("Bienvenido: ${data['user_data']['email']}")
+                : const Text("Bienvenido"),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pushReplacementNamed('/dashboard');
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        setState(() {
+          String? detail;
+          try {
+            final jsonBody = jsonDecode(resp.body);
+            detail = jsonBody['detail'];
+          } catch (_) {
+            detail = resp.body;
+          }
+          switch (resp.statusCode) {
+            case 401:
+              _error = "Usuario o contraseña incorrectos";
+              break;
+            case 422:
+              _error = "Faltan datos o son inválidos.";
+              break;
+            default:
+              _error = detail ?? "Error de autenticación";
+          }
+        });
+      }
+    } catch (e, s) {
+      logger.e("EXCEPTION: $e\nSTACK: $s");
+      setState(() {
+        _error = "Error de conexión";
+      });
+    } finally {
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return "Ingresa tu email";
+    }
+    final email = value.trim();
+    final emailRegExp = RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+    if (!emailRegExp.hasMatch(email)) {
+      return "Email inválido";
+    }
+    if (email.contains(' ')) {
+      return "Sin espacios en email";
+    }
+    if (email.length > 50) {
+      return "Email demasiado largo";
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return "Ingresa tu contraseña";
+    }
+    if (value.contains(' ')) {
+      return "Sin espacios en contraseña";
+    }
+    if (value.length < 8 || value.length > 32) {
+      return "Debe tener entre 8 y 32 caracteres";
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Login')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(18),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _emailController,
+                enabled: !_loading,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                validator: _validateEmail,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.email],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _passwordController,
+                enabled: !_loading,
+                decoration: const InputDecoration(
+                  labelText: 'Contraseña',
+                  prefixIcon: Icon(Icons.lock),
+                ),
+                obscureText: true,
+                validator: _validatePassword,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.password],
+                onFieldSubmitted: (_) {
+                  if (!_loading) _login();
+                },
+              ),
+              const SizedBox(height: 20),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _loading ? null : _login,
+                  child: _loading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text("Iniciar sesión"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
