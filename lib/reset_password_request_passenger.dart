@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+// Importa tu pantalla de confirmación
+import 'reset_password_confirm_passenger.dart';
 
 class ResetPasswordRequestPassengerScreen extends StatefulWidget {
   const ResetPasswordRequestPassengerScreen({super.key});
@@ -39,6 +41,25 @@ class _ResetPasswordRequestPassengerScreenState
         setState(() {
           _success = "Código enviado, revisa tu correo";
         });
+
+        // Opcional: Snackbar para mejor UX
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Código enviado, revisa tu correo")),
+        );
+
+        // Espera breve para que vea el mensaje
+        await Future.delayed(const Duration(milliseconds: 600));
+
+        // Navega a la pantalla para ingresar el código, pasa el email si lo necesitas
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const ResetPasswordConfirmPassengerScreen(),
+              // Si usas email: Navigator.push(context, MaterialPageRoute(builder: (_) => ResetPasswordConfirmPassengerScreen(email: _emailController.text.trim()))),
+            ),
+          );
+        }
       } else {
         setState(() {
           _error = jsonDecode(resp.body)["detail"] ?? "Error desconocido";

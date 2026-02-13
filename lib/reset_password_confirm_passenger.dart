@@ -25,6 +25,7 @@ class _ResetPasswordConfirmPassengerScreenState
     if (_passController.text != _pass2Controller.text) {
       setState(() {
         _error = "Las contraseñas no coinciden";
+        _success = null;
       });
       return;
     }
@@ -50,18 +51,36 @@ class _ResetPasswordConfirmPassengerScreenState
       if (resp.statusCode == 200) {
         setState(() {
           _success = "Contraseña actualizada exitosamente";
+          _error = null;
         });
+
+        // Mostrar snackbar y navegar al login luego de un segundo
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Contraseña actualizada, inicia sesión con tu nueva clave.",
+            ),
+          ),
+        );
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          // O si quieres ir al login por rutas
+          // Navigator.pushReplacementNamed(context, '/login');
+        }
       } else {
         setState(() {
           final respDecoded = jsonDecode(resp.body);
           _error = respDecoded["detail"] is String
               ? respDecoded["detail"]
               : "Error desconocido";
+          _success = null;
         });
       }
     } catch (e) {
       setState(() {
         _error = "Error de conexión";
+        _success = null;
       });
     } finally {
       setState(() {
