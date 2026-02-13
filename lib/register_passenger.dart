@@ -196,111 +196,141 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Registro Pasajero'),
+        title: const Text(
+          'Registro Pasajero',
+          style: TextStyle(fontSize: 20), // Título estándar
+        ),
         backgroundColor: Colors.black,
         foregroundColor: Colors.blue,
+        elevation: 1,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Form(
           key: _formKey,
           child: Column(
             children: [
+              //--- NOMBRE ---
               TextFormField(
                 controller: _nombreController,
                 decoration: InputDecoration(
                   labelText: 'Nombre',
-                  labelStyle: const TextStyle(color: Colors.blue),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blue),
+                  labelStyle: const TextStyle(color: Colors.blue, fontSize: 15),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 1),
                   ),
-                  focusedBorder: OutlineInputBorder(
+                  focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 2),
                   ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 11,
+                    horizontal: 11,
+                  ),
                 ),
-                style: const TextStyle(color: Colors.blue),
+                style: const TextStyle(color: Colors.blue, fontSize: 15),
                 validator: _validateNombre,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 7),
+              //--- APELLIDO ---
               TextFormField(
                 controller: _apellidoController,
                 decoration: InputDecoration(
                   labelText: 'Apellido',
-                  labelStyle: const TextStyle(color: Colors.blue),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blue),
+                  labelStyle: const TextStyle(color: Colors.blue, fontSize: 15),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 1),
                   ),
-                  focusedBorder: OutlineInputBorder(
+                  focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 2),
                   ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 11,
+                    horizontal: 11,
+                  ),
                 ),
-                style: const TextStyle(color: Colors.blue),
+                style: const TextStyle(color: Colors.blue, fontSize: 15),
                 validator: _validateApellido,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 7),
+              //--- EMAIL ---
               TextFormField(
                 controller: _emailController,
                 decoration: InputDecoration(
                   labelText: 'Email',
-                  labelStyle: const TextStyle(color: Colors.blue),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blue),
+                  labelStyle: const TextStyle(color: Colors.blue, fontSize: 15),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 1),
                   ),
-                  focusedBorder: OutlineInputBorder(
+                  focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 2),
                   ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 11,
+                    horizontal: 11,
+                  ),
                   helperText: "Debe ser válido (ejemplo@correo.com)",
-                  helperStyle: TextStyle(color: emeraldGreen),
+                  helperStyle: TextStyle(color: emeraldGreen, fontSize: 13.5),
                 ),
-                style: const TextStyle(color: Colors.blue),
+                style: const TextStyle(color: Colors.blue, fontSize: 15),
                 keyboardType: TextInputType.emailAddress,
                 validator: _validateEmail,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 7),
+              //--- CONTRASEÑA ---
               TextFormField(
                 controller: _passwordController,
                 decoration: InputDecoration(
                   labelText: 'Contraseña',
-                  labelStyle: const TextStyle(color: Colors.blue),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blue),
+                  labelStyle: const TextStyle(color: Colors.blue, fontSize: 15),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 1),
                   ),
-                  focusedBorder: OutlineInputBorder(
+                  focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 2),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 11,
+                    horizontal: 11,
                   ),
                   helperText:
                       "Debe tener entre 8 y 32 caracteres, al menos una mayúscula y un número.",
-                  helperStyle: TextStyle(color: emeraldGreen),
+                  helperStyle: TextStyle(color: emeraldGreen, fontSize: 13.5),
                 ),
-                style: const TextStyle(color: Colors.blue),
+                style: const TextStyle(color: Colors.blue, fontSize: 15),
                 obscureText: true,
                 validator: _validatePassword,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 7),
+              // --- CONFIRMAR CONTRASEÑA ---
               TextFormField(
                 controller: _confirmPasswordController,
                 decoration: InputDecoration(
                   labelText: 'Confirmar contraseña',
-                  labelStyle: const TextStyle(color: Colors.blue),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blue),
+                  labelStyle: const TextStyle(color: Colors.blue, fontSize: 15),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 1),
                   ),
-                  focusedBorder: OutlineInputBorder(
+                  focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 2),
                   ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 11,
+                    horizontal: 11,
+                  ),
                   helperText: "Debe coincidir con tu contraseña.",
-                  helperStyle: TextStyle(color: emeraldGreen),
+                  helperStyle: TextStyle(color: emeraldGreen, fontSize: 13.5),
                 ),
-                style: const TextStyle(color: Colors.blue),
+                style: const TextStyle(color: Colors.blue, fontSize: 15),
                 obscureText: true,
                 validator: _validateConfirmPassword,
                 textInputAction: TextInputAction.done,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 11),
+              // --- TÉRMINOS ---
               Row(
                 children: [
                   Checkbox(
@@ -313,7 +343,7 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                   const Expanded(
                     child: Text(
                       'Acepto los términos y condiciones',
-                      style: TextStyle(color: Colors.blue),
+                      style: TextStyle(color: Colors.blue, fontSize: 14),
                     ),
                   ),
                 ],
@@ -323,23 +353,38 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Debes aceptar los términos',
-                    style: TextStyle(color: Colors.red),
+                    style: TextStyle(color: Colors.red, fontSize: 13.5),
                   ),
                 ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
+              const SizedBox(height: 11),
+              // --- BOTÓN REGISTRARSE ---
+              SizedBox(
+                width: double.infinity,
+                height: 42,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  onPressed: _loading ? null : _registerPassenger,
+                  child: _loading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text("Registrarse"),
                 ),
-                onPressed: _loading ? null : _registerPassenger,
-                child: _loading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(color: Colors.white),
-                      )
-                    : const Text("Registrarse"),
               ),
             ],
           ),
