@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+// Importa la pantalla de confirmación
+import 'reset_password_confirm_conductor.dart';
 
 class ResetPasswordRequestConductorScreen extends StatefulWidget {
   const ResetPasswordRequestConductorScreen({super.key});
@@ -39,6 +41,23 @@ class _ResetPasswordRequestConductorScreenState
         setState(() {
           _success = "Código enviado, revisa tu correo";
         });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Código enviado, revisa tu correo")),
+        );
+
+        await Future.delayed(const Duration(milliseconds: 600));
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ResetPasswordConfirmConductorScreen(
+                // Si quieres pasar el email: email: _emailController.text.trim(),
+              ),
+            ),
+          );
+        }
       } else {
         setState(() {
           _error = jsonDecode(resp.body)["detail"] ?? "Error desconocido";

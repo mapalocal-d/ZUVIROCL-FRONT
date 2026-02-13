@@ -53,6 +53,21 @@ class _ResetPasswordConfirmConductorScreenState
         setState(() {
           _success = "Contraseña actualizada exitosamente.";
         });
+
+        // SnackBar de éxito
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Contraseña actualizada. Inicia sesión."),
+          ),
+        );
+
+        // Espera breve para que usuario vea mensaje
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          // O usa pushReplacementNamed si tienes rutas
+          // Navigator.pushReplacementNamed(context, '/login');
+        }
       } else {
         setState(() {
           final decoded = jsonDecode(resp.body);

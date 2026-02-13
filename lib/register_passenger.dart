@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dashboard_screen.dart';
 
 class RegisterPassengerScreen extends StatefulWidget {
   const RegisterPassengerScreen({super.key});
@@ -15,7 +16,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _aceptaTerminos = false;
   bool _loading = false;
-  String? _error;
 
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _apellidoController = TextEditingController();
@@ -24,12 +24,101 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
+  // ========= VALIDACIONES según tu schema =========
+  String? _validateNombre(String? value) {
+    if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
+    final nombre = value.trim();
+    if (nombre.length < 2) return "Debe tener al menos 2 letras";
+    if (nombre.length > 50) return "Máx 50 letras";
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(nombre))
+      return "Solo letras y espacios";
+    final prohibidos = [
+      "admin",
+      "administrador",
+      "soporte",
+      "root",
+      "moderador",
+      "appcl",
+    ];
+    if (prohibidos.contains(nombre.toLowerCase()))
+      return "Nombre reservado por el sistema";
+    return null;
+  }
+
+  String? _validateApellido(String? value) {
+    if (value == null || value.trim().isEmpty) return "Ingresa tu apellido";
+    final apellido = value.trim();
+    if (apellido.length < 2) return "Debe tener al menos 2 letras";
+    if (apellido.length > 50) return "Máx 50 letras";
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(apellido))
+      return "Solo letras y espacios";
+    final prohibidos = [
+      "admin",
+      "administrador",
+      "soporte",
+      "root",
+      "moderador",
+      "appcl",
+    ];
+    if (prohibidos.contains(apellido.toLowerCase()))
+      return "Apellido reservado por el sistema";
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return "Ingresa tu email";
+    final email = value.trim().toLowerCase();
+    if (email.contains(' ')) return "El email no puede contener espacios";
+    if (!email.contains('@')) return "Formato de email inválido";
+    final parts = email.split('@');
+    if (parts.length != 2) return "Email inválido (debe tener solo un @)";
+    final parte_local = parts[0];
+    final dominio = parts[1];
+    if (email.contains('..'))
+      return "El email no puede contener puntos consecutivos";
+    if (parte_local.startsWith('.') || parte_local.endsWith('.'))
+      return "La parte antes del @ no puede empezar ni terminar con punto.";
+    if (dominio.endsWith('.com.com') ||
+        dominio.endsWith('.cl.cl') ||
+        dominio.endsWith('.es.es'))
+      return "Dominio de email inválido. Verifica que esté escrito correctamente.";
+    if (!dominio.contains('.')) return "Falta punto en el dominio";
+    if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email))
+      return "Email inválido";
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return "Ingresa una contraseña";
+    if (value.length < 8) return "Mínimo 8 caracteres";
+    if (value.length > 32) return "Máximo 32 caracteres";
+    if (!RegExp(r'[A-Z]').hasMatch(value))
+      return "La contraseña debe contener al menos una letra mayúscula (A-Z)";
+    if (!RegExp(r'\d').hasMatch(value))
+      return "La contraseña debe contener al menos un número (0-9)";
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value != _passwordController.text)
+      return "Las contraseñas no coinciden";
+    return null;
+  }
+
+  // ========= REGISTRO Y NAVEGACIÓN =========
   Future<void> _registerPassenger() async {
-    if (!_formKey.currentState!.validate() || !_aceptaTerminos) return;
+    if (!_formKey.currentState!.validate() || !_aceptaTerminos) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Completa todos los campos y acepta los términos."),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _loading = true;
-      _error = null;
     });
 
     final url = Uri.parse(
@@ -50,45 +139,49 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(body),
       );
+      final messenger = ScaffoldMessenger.of(context);
       if (resp.statusCode == 201) {
         final respBody = json.decode(resp.body);
-
-        // ====== GUARDA EL TOKEN JWT DESPUÉS DE REGISTRO ======
         final accessToken = respBody['access_token'];
         if (accessToken != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('access_token', accessToken);
         }
-        // ======================================================
-
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text("¡Registro exitoso!"),
-            content: const Text(
-              "Te hemos registrado y ya tienes 1 mes gratis de suscripción.",
-            ),
-            actions: [
-              TextButton(
-                child: const Text('OK'),
-                onPressed: () =>
-                    Navigator.of(context).popUntil((route) => route.isFirst),
-              ),
-            ],
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text("¡Registro exitoso! Bienvenido a tu cuenta."),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
           ),
         );
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => DashboardScreen()),
+          );
+        }
       } else {
         final respBody = json.decode(resp.body);
-        setState(() {
-          _error =
-              (respBody['detail'] ?? "Registro fallido. Intenta nuevamente.")
-                  .toString();
-        });
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              respBody['detail'] ?? "Registro fallido. Intenta nuevamente.",
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
-      setState(() {
-        _error = "Error de conexión";
-      });
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text("Error de conexión."),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
     } finally {
       setState(() {
         _loading = false;
@@ -96,85 +189,17 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
     }
   }
 
-  // ===== FUNCIONES DE VALIDACIÓN =====
-
-  String? _validateNombre(String? value) {
-    if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
-    if (value.length < 2) return "Debe tener al menos 2 letras";
-    if (value.length > 50) return "Máx 50 letras";
-    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(value))
-      return "Solo letras y espacios";
-    final prohibidos = [
-      "admin",
-      "administrador",
-      "soporte",
-      "root",
-      "moderador",
-      "appcl",
-    ];
-    if (prohibidos.contains(value.trim().toLowerCase()))
-      return "Nombre reservado";
-    return null;
-  }
-
-  String? _validateApellido(String? value) {
-    if (value == null || value.trim().isEmpty) return "Ingresa tu apellido";
-    if (value.length < 2) return "Debe tener al menos 2 letras";
-    if (value.length > 50) return "Máx 50 letras";
-    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(value))
-      return "Solo letras y espacios";
-    final prohibidos = [
-      "admin",
-      "administrador",
-      "soporte",
-      "root",
-      "moderador",
-      "appcl",
-    ];
-    if (prohibidos.contains(value.trim().toLowerCase()))
-      return "Apellido reservado";
-    return null;
-  }
-
-  String? _validateEmail(String? value) {
-    if (value == null || value.trim().isEmpty) return "Ingresa tu email";
-    if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(value))
-      return "Email inválido";
-    if (value.contains('..') || value.startsWith('.') || value.endsWith('.'))
-      return "Email inválido";
-    if (value.contains('@')) {
-      final dom = value.split('@')[1];
-      if (dom.endsWith('.com.com') ||
-          dom.endsWith('.cl.cl') ||
-          dom.endsWith('.es.es')) {
-        return "Revisa el dominio de tu email";
-      }
-    }
-    if (value.contains(' ')) return "Sin espacios en email";
-    return null;
-  }
-
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) return "Ingresa una contraseña";
-    if (value.length < 8) return "Mínimo 8 caracteres";
-    if (value.length > 32) return "Máximo 32 caracteres";
-    if (!RegExp(r'[A-Z]').hasMatch(value)) return "Debe tener una mayúscula";
-    if (!RegExp(r'\d').hasMatch(value)) return "Debe tener un número";
-    return null;
-  }
-
-  String? _validateConfirmPassword(String? value) {
-    if (value != _passwordController.text)
-      return "Las contraseñas no coinciden";
-    return null;
-  }
-
-  // ====== FIN VALIDACIONES ======
-
   @override
   Widget build(BuildContext context) {
+    const emeraldGreen = Color(0xFF50C878); // Verde esmeralda
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Registro Pasajero')),
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Registro Pasajero'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.blue,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: Form(
@@ -183,21 +208,53 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
             children: [
               TextFormField(
                 controller: _nombreController,
-                decoration: const InputDecoration(labelText: 'Nombre'),
+                decoration: InputDecoration(
+                  labelText: 'Nombre',
+                  labelStyle: const TextStyle(color: Colors.blue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 2),
+                  ),
+                ),
+                style: const TextStyle(color: Colors.blue),
                 validator: _validateNombre,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 10),
               TextFormField(
                 controller: _apellidoController,
-                decoration: const InputDecoration(labelText: 'Apellido'),
+                decoration: InputDecoration(
+                  labelText: 'Apellido',
+                  labelStyle: const TextStyle(color: Colors.blue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 2),
+                  ),
+                ),
+                style: const TextStyle(color: Colors.blue),
                 validator: _validateApellido,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 10),
               TextFormField(
                 controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  labelStyle: const TextStyle(color: Colors.blue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 2),
+                  ),
+                  helperText: "Debe ser válido (ejemplo@correo.com)",
+                  helperStyle: TextStyle(color: emeraldGreen),
+                ),
+                style: const TextStyle(color: Colors.blue),
                 keyboardType: TextInputType.emailAddress,
                 validator: _validateEmail,
                 textInputAction: TextInputAction.next,
@@ -205,7 +262,20 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
               const SizedBox(height: 10),
               TextFormField(
                 controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Contraseña'),
+                decoration: InputDecoration(
+                  labelText: 'Contraseña',
+                  labelStyle: const TextStyle(color: Colors.blue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 2),
+                  ),
+                  helperText:
+                      "Debe tener entre 8 y 32 caracteres, al menos una mayúscula y un número.",
+                  helperStyle: TextStyle(color: emeraldGreen),
+                ),
+                style: const TextStyle(color: Colors.blue),
                 obscureText: true,
                 validator: _validatePassword,
                 textInputAction: TextInputAction.next,
@@ -213,9 +283,19 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
               const SizedBox(height: 10),
               TextFormField(
                 controller: _confirmPasswordController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Confirmar contraseña',
+                  labelStyle: const TextStyle(color: Colors.blue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blue, width: 2),
+                  ),
+                  helperText: "Debe coincidir con tu contraseña.",
+                  helperStyle: TextStyle(color: emeraldGreen),
                 ),
+                style: const TextStyle(color: Colors.blue),
                 obscureText: true,
                 validator: _validateConfirmPassword,
                 textInputAction: TextInputAction.done,
@@ -227,9 +307,14 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                     value: _aceptaTerminos,
                     onChanged: (value) =>
                         setState(() => _aceptaTerminos = value ?? false),
+                    activeColor: Colors.blue,
+                    checkColor: Colors.black,
                   ),
                   const Expanded(
-                    child: Text('Acepto los términos y condiciones'),
+                    child: Text(
+                      'Acepto los términos y condiciones',
+                      style: TextStyle(color: Colors.blue),
+                    ),
                   ),
                 ],
               ),
@@ -241,18 +326,18 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                     style: TextStyle(color: Colors.red),
                   ),
                 ),
-              if (_error != null) ...[
-                const SizedBox(height: 10),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-              ],
               const SizedBox(height: 16),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: _loading ? null : _registerPassenger,
                 child: _loading
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(),
+                        child: CircularProgressIndicator(color: Colors.white),
                       )
                     : const Text("Registrarse"),
               ),
