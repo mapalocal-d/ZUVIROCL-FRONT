@@ -39,8 +39,20 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
   bool _loadingCities = true;
   bool _loadingLines = false;
 
-  //====================== VALIDACIONES ======================
+  // ------------------ Normalizador de Ciudad ------------------
+  String normalizarCiudad(String? nombre) {
+    if (nombre == null) return '';
+    return nombre
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ñ', 'n');
+  }
 
+  // ------------------- Validadores -------------------
   String? _validateNombre(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
     final nombre = value.trim();
@@ -146,7 +158,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     return null;
   }
 
-  //====================== CONEXIÓN Y CARGA =====================
   @override
   void initState() {
     super.initState();
@@ -192,16 +203,17 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       lineas = [];
       _selectedLinea = null;
     });
+    final ciudadNormalizada = normalizarCiudad(ciudad);
     try {
       final resp = await http.get(
         Uri.parse(
-          'https://graceful-balance-production-ef1d.up.railway.app/config/lines?ciudad=${Uri.encodeComponent(ciudad)}',
+          'https://graceful-balance-production-ef1d.up.railway.app/config/lines?ciudad=${Uri.encodeComponent(ciudadNormalizada)}',
         ),
       );
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
         setState(() {
-          lineas = List<Map<String, dynamic>>.from(data['lineas']);
+          lineas = List<Map<String, dynamic>>.from(data['lineas'] ?? []);
           _loadingLines = false;
         });
       } else {
@@ -218,7 +230,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     }
   }
 
-  //====================== REGISTRO Y NAVEGACIÓN =====================
   Future<void> _registerDriver() async {
     if (!_formKey.currentState!.validate() || !_aceptaTerminos) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -318,7 +329,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     }
   }
 
-  // ======================= BUILD SELECTORS & FORM ======================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -360,6 +370,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                 obscure: true,
                 helper: "Debe coincidir con tu contraseña.",
               ),
+
               // --- Región Selector (con ayuda en verde) ---
               Padding(
                 padding: const EdgeInsets.only(bottom: 7),
