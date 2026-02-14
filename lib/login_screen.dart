@@ -60,11 +60,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
 
-        // ===== GUARDAR EL TOKEN EN DISCO =====
+        // ===== GUARDAR EL TOKEN Y EL ROL EN DISCO =====
         final accessToken = data['access_token'];
+        final userData = data['user_data'];
         if (accessToken != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('access_token', accessToken);
+
+          // Guardar también el rol para navegación automática posterior
+          if (userData != null && userData['rol'] != null) {
+            await prefs.setString('rol', userData['rol'].toString());
+          }
         } else {
           setState(() {
             _error = "Login exitoso pero token no recibido.";
@@ -76,20 +82,31 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.clear();
         _passwordController.clear();
 
-        // Avisa éxito y navega a dashboard
+        String? rol = userData != null ? userData['rol'] : null;
+
+        // Avisa éxito y navega al dashboard correcto según rol
         if (!mounted) return;
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('Login exitoso'),
-            content: data['user_data']?['email'] != null
-                ? Text("Bienvenido: ${data['user_data']['email']}")
+            content: userData?['email'] != null
+                ? Text("Bienvenido: ${userData['email']}")
                 : const Text("Bienvenido"),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  Navigator.of(context).pushReplacementNamed('/dashboard');
+                  // Cambia el dashboard según el rol:
+                  if (rol == "conductor") {
+                    Navigator.of(
+                      context,
+                    ).pushReplacementNamed('/dashboard_conductor');
+                  } else {
+                    Navigator.of(
+                      context,
+                    ).pushReplacementNamed('/dashboard_pasajero');
+                  }
                 },
                 child: const Text('OK'),
               ),
