@@ -17,12 +17,17 @@ class _RootScreenState extends State<RootScreen> {
   Future<void> _checkIfLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
-    if (token != null && token.isNotEmpty) {
-      Navigator.of(context).pushReplacementNamed('/dashboard');
+    final rol = prefs.getString('rol'); // <-- Lee el rol guardado
+    if (token != null && token.isNotEmpty && rol != null && rol.isNotEmpty) {
+      // Si el usuario tiene sesión y rol, navega según el rol:
+      if (rol == "conductor") {
+        Navigator.of(context).pushReplacementNamed('/dashboard_conductor');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/dashboard_pasajero');
+      }
     } else {
-      Navigator.of(
-        context,
-      ).pushReplacementNamed('/home'); // <--- EL CAMBIO AQUÍ
+      // Si NO hay sesión, va a Home (landing/login)
+      Navigator.of(context).pushReplacementNamed('/home');
     }
   }
 
