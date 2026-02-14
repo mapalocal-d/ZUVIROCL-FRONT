@@ -15,27 +15,34 @@ class LogoutButton extends StatelessWidget {
         await http.post(
           Uri.parse(
             'https://graceful-balance-production-ef1d.up.railway.app/logout',
-          ), // URL real de Railway
+          ),
           headers: {"Authorization": "Bearer $token"},
         );
       } catch (_) {
-        // Puedes ignorar el error, tu backend solo registra el evento
+        // Ignora error: solo para registro en backend
       }
     }
 
-    // 2. Borra el token local
-    await prefs.remove('access_token');
+    // 2. Borra toda la sesión local
+    await prefs.clear(); // Borra access_token, rol y todo lo demás
 
-    // 3. Lleva al login limpiando la navegación
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    // 3. Redirige limpiando todo el stack a la pantalla inicial
+    // Primero cierra el Drawer para evitar errores visuales
+    Navigator.of(
+      context,
+    ).pop(); // Cierra Drawer si existe (seguro, si lo llamas desde Drawer)
+    // Ahora navega a HomeScreen (pantalla principal)
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.logout),
-      tooltip: 'Cerrar sesión',
-      onPressed: () => _logout(context),
+    return ListTile(
+      leading: const Icon(Icons.logout),
+      title: const Text('Cerrar sesión'),
+      onTap: () async {
+        await _logout(context);
+      },
     );
   }
 }
