@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'logout_button.dart'; // Asegúrate de que la ruta sea la correcta
 
 class DashboardPasajero extends StatelessWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
@@ -15,14 +16,12 @@ class DashboardPasajero extends StatelessWidget {
             UserAccountsDrawerHeader(
               accountName: Text(
                 'Nombre del pasajero',
-              ), // puedes cambiar dinámicamente
+              ), // Puedes cambiar dinámicamente
               accountEmail: Text(
                 'correo@ejemplo.com',
-              ), // puedes cambiar dinámicamente
+              ), // Puedes cambiar dinámicamente
               currentAccountPicture: CircleAvatar(
-                backgroundImage: AssetImage(
-                  'assets/avatar_default.png',
-                ), // o NetworkImage
+                backgroundImage: AssetImage('assets/avatar_default.png'),
               ),
               decoration: BoxDecoration(color: Colors.blue),
             ),
@@ -30,8 +29,7 @@ class DashboardPasajero extends StatelessWidget {
               leading: Icon(Icons.account_circle),
               title: Text('Perfil'),
               onTap: () {
-                // Navega a la pantalla de perfil
-                Navigator.pop(context); // Cierra el drawer
+                Navigator.pop(context);
                 // Navigator.push(context, MaterialPageRoute(builder: (_) => PerfilScreen()));
               },
             ),
@@ -39,7 +37,6 @@ class DashboardPasajero extends StatelessWidget {
               leading: Icon(Icons.payment),
               title: Text('Pagar suscripción'),
               onTap: () {
-                // Navega a la pantalla de pagos/suscripción
                 Navigator.pop(context);
                 // Navigator.push(context, MaterialPageRoute(builder: (_) => PagoSuscripcionScreen()));
               },
@@ -48,7 +45,6 @@ class DashboardPasajero extends StatelessWidget {
               leading: Icon(Icons.history),
               title: Text('Historial de pagos'),
               onTap: () {
-                // Navega a la pantalla de historial de pagos
                 Navigator.pop(context);
                 // Navigator.push(context, MaterialPageRoute(builder: (_) => HistorialPagoScreen()));
               },
@@ -57,20 +53,12 @@ class DashboardPasajero extends StatelessWidget {
               leading: Icon(Icons.help_outline),
               title: Text('Ayuda y soporte'),
               onTap: () {
-                // Navega a la pantalla de ayuda/soporte
                 Navigator.pop(context);
                 // Navigator.push(context, MaterialPageRoute(builder: (_) => AyudaSoporteScreen()));
               },
             ),
             Divider(),
-            ListTile(
-              leading: Icon(Icons.logout),
-              title: Text('Cerrar sesión'),
-              onTap: () {
-                Navigator.pop(context);
-                // Lógica de logout y redirección a login
-              },
-            ),
+            const LogoutButton(), // 👈 Botón de logout reutilizable
           ],
         ),
       ),
