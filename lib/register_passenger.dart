@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dashboard_screen.dart';
 
 class RegisterPassengerScreen extends StatefulWidget {
   const RegisterPassengerScreen({super.key});
@@ -24,7 +23,7 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
-  // ========= VALIDACIONES según tu schema =========
+  // ========= VALIDACIONES =========
   String? _validateNombre(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
     final nombre = value.trim();
@@ -156,10 +155,8 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
         );
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => DashboardScreen()),
-          );
+          // NAVEGACIÓN: RUTA POR NOMBRE AL DASHBOARD DE PASAJERO
+          Navigator.pushReplacementNamed(context, '/dashboard_pasajero');
         }
       } else {
         final respBody = json.decode(resp.body);
@@ -191,15 +188,12 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const emeraldGreen = Color(0xFF50C878); // Verde esmeralda
+    const emeraldGreen = Color(0xFF50C878);
 
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text(
-          'Registro Pasajero',
-          style: TextStyle(fontSize: 20), // Título estándar
-        ),
+        title: const Text('Registro Pasajero', style: TextStyle(fontSize: 20)),
         backgroundColor: Colors.black,
         foregroundColor: Colors.blue,
         elevation: 1,
@@ -210,7 +204,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
           key: _formKey,
           child: Column(
             children: [
-              //--- NOMBRE ---
               TextFormField(
                 controller: _nombreController,
                 decoration: InputDecoration(
@@ -232,7 +225,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 7),
-              //--- APELLIDO ---
               TextFormField(
                 controller: _apellidoController,
                 decoration: InputDecoration(
@@ -254,7 +246,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 7),
-              //--- EMAIL ---
               TextFormField(
                 controller: _emailController,
                 decoration: InputDecoration(
@@ -279,7 +270,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 7),
-              //--- CONTRASEÑA ---
               TextFormField(
                 controller: _passwordController,
                 decoration: InputDecoration(
@@ -305,7 +295,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 7),
-              // --- CONFIRMAR CONTRASEÑA ---
               TextFormField(
                 controller: _confirmPasswordController,
                 decoration: InputDecoration(
@@ -330,7 +319,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                 textInputAction: TextInputAction.done,
               ),
               const SizedBox(height: 11),
-              // --- TÉRMINOS ---
               Row(
                 children: [
                   Checkbox(
@@ -357,7 +345,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                   ),
                 ),
               const SizedBox(height: 11),
-              // --- BOTÓN REGISTRARSE ---
               SizedBox(
                 width: double.infinity,
                 height: 42,

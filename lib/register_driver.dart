@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dashboard_screen.dart';
 
 const emeraldGreen = Color(0xFF50C878);
 
@@ -39,7 +38,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
   bool _loadingCities = true;
   bool _loadingLines = false;
 
-  // ------------------ Normalizador de Ciudad ------------------
   String normalizarCiudad(String? nombre) {
     if (nombre == null) return '';
     return nombre
@@ -52,7 +50,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
         .replaceAll('ñ', 'n');
   }
 
-  // ------------------- Validadores -------------------
+  // ----- Validadores -----
   String? _validateNombre(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
     final nombre = value.trim();
@@ -290,10 +288,8 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
 
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => DashboardScreen()),
-          );
+          // NAVEGA AL DASHBOARD DE CONDUCTOR POR RUTA:
+          Navigator.pushReplacementNamed(context, '/dashboard_conductor');
         }
       } else {
         final respBody = json.decode(resp.body);
