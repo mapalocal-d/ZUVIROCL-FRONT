@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-// Importa otras pantallas
-import 'dashboard_screen.dart';
+// Importa tus pantallas
+import 'dashboard_conductor.dart';
+import 'dashboard_pasajero.dart';
 import 'register_passenger.dart';
 import 'register_driver.dart';
 import 'login_screen.dart';
@@ -110,7 +111,8 @@ class ZuviroApp extends StatelessWidget {
         '/register-passenger': (_) => const RegisterPassengerScreen(),
         '/register-driver': (_) => const RegisterDriverScreen(),
         '/login': (_) => const LoginScreen(),
-        '/dashboard': (_) => DashboardScreen(),
+        '/dashboard_conductor': (_) => const DashboardConductor(),
+        '/dashboard_pasajero': (_) => const DashboardPasajero(),
         '/reset-passenger-request': (_) =>
             const ResetPasswordRequestPassengerScreen(),
         '/reset-passenger-confirm': (_) =>
@@ -124,6 +126,7 @@ class ZuviroApp extends StatelessWidget {
   }
 }
 
+// HomeScreen y botón de acceso rápido (puedes dejar igual que antes):
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -226,11 +229,9 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color accent = Theme.of(context).colorScheme.secondary;
-
-    // Ajustes solicitados:
-    final double svgHeight = 190; // Imagen más grande
+    final double svgHeight = 190;
     final double topSpace = MediaQuery.of(context).size.height < 700 ? 32 : 84;
-    final double buttonMargin = 80; // Botones más abajo
+    final double buttonMargin = 80;
     final double buttonTopOffset = topSpace + svgHeight + buttonMargin;
 
     return Scaffold(
