@@ -1,68 +1,90 @@
 import 'package:flutter/material.dart';
-import 'logout_button.dart'; // Asegúrate de que la ruta sea la correcta
+import 'package:shared_preferences/shared_preferences.dart';
+import 'perfil_pasajero.dart'; // Ruta correcta de tu archivo con PerfilPasajeroScreen
+import 'logout_button.dart'; // Ruta correcta de tu logout
 
 class DashboardPasajero extends StatelessWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
+
+  // Puedes obtener nombre/email desde SharedPreferences para el drawer:
+  Future<Map<String, String>> _getNombreEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Si guardas los datos en prefs; sino, puedes dejar por defecto/después vincular desde Provider.
+    final nombre = prefs.getString('nombre') ?? 'Nombre del pasajero';
+    final apellido = prefs.getString('apellido') ?? '';
+    final email = prefs.getString('email') ?? 'correo@ejemplo.com';
+    return {'nombre': '$nombre $apellido', 'email': email};
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Panel Pasajero')),
       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            // Header del drawer (perfil)
-            UserAccountsDrawerHeader(
-              accountName: Text(
-                'Nombre del pasajero',
-              ), // Puedes cambiar dinámicamente
-              accountEmail: Text(
-                'correo@ejemplo.com',
-              ), // Puedes cambiar dinámicamente
-              currentAccountPicture: CircleAvatar(
-                backgroundImage: AssetImage('assets/avatar_default.png'),
-              ),
-              decoration: BoxDecoration(color: Colors.blue),
-            ),
-            ListTile(
-              leading: Icon(Icons.account_circle),
-              title: Text('Perfil'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigator.push(context, MaterialPageRoute(builder: (_) => PerfilScreen()));
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.payment),
-              title: Text('Pagar suscripción'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigator.push(context, MaterialPageRoute(builder: (_) => PagoSuscripcionScreen()));
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.history),
-              title: Text('Historial de pagos'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigator.push(context, MaterialPageRoute(builder: (_) => HistorialPagoScreen()));
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.help_outline),
-              title: Text('Ayuda y soporte'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigator.push(context, MaterialPageRoute(builder: (_) => AyudaSoporteScreen()));
-              },
-            ),
-            Divider(),
-            const LogoutButton(), // 👈 Botón de logout reutilizable
-          ],
+        child: FutureBuilder<Map<String, String>>(
+          future: _getNombreEmail(),
+          builder: (context, snapshot) {
+            final nombre = snapshot.data?['nombre'] ?? 'Nombre del pasajero';
+            final email = snapshot.data?['email'] ?? 'correo@ejemplo.com';
+
+            return ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                UserAccountsDrawerHeader(
+                  accountName: Text(nombre),
+                  accountEmail: Text(email),
+                  currentAccountPicture: const CircleAvatar(
+                    backgroundImage: AssetImage('assets/avatar_default.png'),
+                  ),
+                  decoration: const BoxDecoration(color: Colors.blue),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.account_circle),
+                  title: const Text('Perfil'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PerfilPasajeroScreen(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.payment),
+                  title: const Text('Pagar suscripción'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigator.push(context, MaterialPageRoute(builder: (_) => PagoSuscripcionScreen()));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.history),
+                  title: const Text('Historial de pagos'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigator.push(context, MaterialPageRoute(builder: (_) => HistorialPagoScreen()));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.help_outline),
+                  title: const Text('Ayuda y soporte'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigator.push(context, MaterialPageRoute(builder: (_) => AyudaSoporteScreen()));
+                  },
+                ),
+                const Divider(),
+                const LogoutButton(),
+              ],
+            );
+          },
         ),
       ),
-      body: Center(child: Text('Contenido principal del dashboard pasajero')),
+      body: const Center(
+        child: Text('Contenido principal del dashboard pasajero'),
+      ),
     );
   }
 }
