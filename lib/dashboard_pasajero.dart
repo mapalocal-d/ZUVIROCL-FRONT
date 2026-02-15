@@ -52,34 +52,11 @@ class DashboardPasajero extends StatelessWidget {
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.payment),
-                  title: const Text('Pagar suscripción manual'),
+                  title: const Text('Pagar suscripción'),
                   onTap: () {
                     Navigator.pop(context);
                     // Navigator.push(context, MaterialPageRoute(builder: (_) => PagoSuscripcionScreen()));
                   },
-                  subtitle: const Text(
-                    'Pago único por meses, vía MercadoPago.',
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.sync),
-                  title: const Text('Activar débito automático'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Navigator.push(context, MaterialPageRoute(builder: (_) => ActivarDebitoScreen()));
-                  },
-                  subtitle: const Text(
-                    'Activa pago mensual recurrente automático',
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.cancel),
-                  title: const Text('Cancelar débito automático'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Navigator.push(context, MaterialPageRoute(builder: (_) => CancelarDebitoScreen()));
-                  },
-                  subtitle: const Text('Desactiva el débito automático'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.verified_user),
@@ -88,11 +65,7 @@ class DashboardPasajero extends StatelessWidget {
                     Navigator.pop(context);
                     // Navigator.push(context, MaterialPageRoute(builder: (_) => EstadoSuscripcionScreen()));
                   },
-                  subtitle: const Text(
-                    'Consulta si tienes una suscripción activa o pendiente',
-                  ),
                 ),
-                const Divider(),
                 ListTile(
                   leading: const Icon(Icons.history),
                   title: const Text('Historial de pagos'),
