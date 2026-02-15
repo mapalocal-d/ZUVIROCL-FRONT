@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'perfil_pasajero.dart'; // Ruta a tu archivo de Mi Cuenta
 import 'logout_button.dart'; // Ruta correcta para tu logout
+import 'pagar_suscripcion_pasajero.dart'; // <-- Asegúrate que aquí está PagoSuscripcionScreen
 
 class DashboardPasajero extends StatelessWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
@@ -55,7 +56,13 @@ class DashboardPasajero extends StatelessWidget {
                   title: const Text('Pagar suscripción'),
                   onTap: () {
                     Navigator.pop(context);
-                    // Navigator.push(context, MaterialPageRoute(builder: (_) => PagoSuscripcionScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const PagoSuscripcionScreen(), // <--- ESTE ES EL CAMBIO PRINCIPAL
+                      ),
+                    );
                   },
                 ),
                 ListTile(
