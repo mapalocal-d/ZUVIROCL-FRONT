@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'perfil_pasajero.dart'; // Ruta correcta de tu archivo con PerfilPasajeroScreen
-import 'logout_button.dart'; // Ruta correcta de tu logout
+import 'perfil_pasajero.dart'; // Ruta a tu archivo de Mi Cuenta
+import 'logout_button.dart'; // Ruta correcta para tu logout
 
 class DashboardPasajero extends StatelessWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
 
-  // Puedes obtener nombre/email desde SharedPreferences para el drawer:
   Future<Map<String, String>> _getNombreEmail() async {
     final prefs = await SharedPreferences.getInstance();
-    // Si guardas los datos en prefs; sino, puedes dejar por defecto/después vincular desde Provider.
     final nombre = prefs.getString('nombre') ?? 'Nombre del pasajero';
     final apellido = prefs.getString('apellido') ?? '';
     final email = prefs.getString('email') ?? 'correo@ejemplo.com';
@@ -39,8 +37,8 @@ class DashboardPasajero extends StatelessWidget {
                   decoration: const BoxDecoration(color: Colors.blue),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.account_circle),
-                  title: const Text('Perfil'),
+                  leading: const Icon(Icons.manage_accounts),
+                  title: const Text('Mi Cuenta'),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
@@ -51,14 +49,50 @@ class DashboardPasajero extends StatelessWidget {
                     );
                   },
                 ),
+                const Divider(),
                 ListTile(
                   leading: const Icon(Icons.payment),
-                  title: const Text('Pagar suscripción'),
+                  title: const Text('Pagar suscripción manual'),
                   onTap: () {
                     Navigator.pop(context);
                     // Navigator.push(context, MaterialPageRoute(builder: (_) => PagoSuscripcionScreen()));
                   },
+                  subtitle: const Text(
+                    'Pago único por meses, vía MercadoPago.',
+                  ),
                 ),
+                ListTile(
+                  leading: const Icon(Icons.sync),
+                  title: const Text('Activar débito automático'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigator.push(context, MaterialPageRoute(builder: (_) => ActivarDebitoScreen()));
+                  },
+                  subtitle: const Text(
+                    'Activa pago mensual recurrente automático',
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cancel),
+                  title: const Text('Cancelar débito automático'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigator.push(context, MaterialPageRoute(builder: (_) => CancelarDebitoScreen()));
+                  },
+                  subtitle: const Text('Desactiva el débito automático'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.verified_user),
+                  title: const Text('Estado de suscripción'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigator.push(context, MaterialPageRoute(builder: (_) => EstadoSuscripcionScreen()));
+                  },
+                  subtitle: const Text(
+                    'Consulta si tienes una suscripción activa o pendiente',
+                  ),
+                ),
+                const Divider(),
                 ListTile(
                   leading: const Icon(Icons.history),
                   title: const Text('Historial de pagos'),
