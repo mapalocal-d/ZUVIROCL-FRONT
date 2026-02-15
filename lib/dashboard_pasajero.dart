@@ -4,6 +4,7 @@ import 'perfil_pasajero.dart'; // Ruta a tu archivo de Mi Cuenta
 import 'logout_button.dart'; // Ruta correcta para tu logout
 import 'pagar_suscripcion_pasajero.dart'; // Asegúrate que aquí está PagoSuscripcionScreen
 import 'estado_suscripcion_pasajero.dart'; // Importa el widget del estado de suscripción
+import 'historial_pago_pasajero.dart'; // <-- agrega tu screen de historial de pagos aquí
 
 class DashboardPasajero extends StatelessWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
@@ -83,8 +84,13 @@ class DashboardPasajero extends StatelessWidget {
                   title: const Text('Historial de pagos'),
                   onTap: () {
                     Navigator.pop(context);
-                    // Aquí deberías enlazar tu HistorialPagoScreen cuando lo tengas:
-                    // Navigator.push(context, MaterialPageRoute(builder: (_) => HistorialPagoScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const HistorialPagoPasajeroScreen(), // <-- AQUI ENLAZA
+                      ),
+                    );
                   },
                 ),
                 ListTile(
