@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'perfil_pasajero.dart'; // Ruta a tu archivo de Mi Cuenta
 import 'logout_button.dart'; // Ruta correcta para tu logout
-import 'pagar_suscripcion_pasajero.dart'; // <-- Asegúrate que aquí está PagoSuscripcionScreen
+import 'pagar_suscripcion_pasajero.dart'; // Asegúrate que aquí está PagoSuscripcionScreen
+import 'estado_suscripcion_pasajero.dart'; // Importa el widget del estado de suscripción
 
 class DashboardPasajero extends StatelessWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
@@ -59,8 +60,7 @@ class DashboardPasajero extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            const PagoSuscripcionScreen(), // <--- ESTE ES EL CAMBIO PRINCIPAL
+                        builder: (_) => const PagoSuscripcionScreen(),
                       ),
                     );
                   },
@@ -70,7 +70,12 @@ class DashboardPasajero extends StatelessWidget {
                   title: const Text('Estado de suscripción'),
                   onTap: () {
                     Navigator.pop(context);
-                    // Navigator.push(context, MaterialPageRoute(builder: (_) => EstadoSuscripcionScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EstadoSuscripcionPasajeroScreen(),
+                      ),
+                    );
                   },
                 ),
                 ListTile(
@@ -78,6 +83,7 @@ class DashboardPasajero extends StatelessWidget {
                   title: const Text('Historial de pagos'),
                   onTap: () {
                     Navigator.pop(context);
+                    // Aquí deberías enlazar tu HistorialPagoScreen cuando lo tengas:
                     // Navigator.push(context, MaterialPageRoute(builder: (_) => HistorialPagoScreen()));
                   },
                 ),
@@ -86,6 +92,7 @@ class DashboardPasajero extends StatelessWidget {
                   title: const Text('Ayuda y soporte'),
                   onTap: () {
                     Navigator.pop(context);
+                    // Aquí deberías enlazar tu AyudaSoporteScreen cuando lo tengas:
                     // Navigator.push(context, MaterialPageRoute(builder: (_) => AyudaSoporteScreen()));
                   },
                 ),

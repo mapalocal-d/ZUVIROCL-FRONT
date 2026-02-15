@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 
-// NO OLVIDES IMPORTAR TU DASHBOARD
+// Importa tu Dashboard
 import 'dashboard_pasajero.dart';
 
 class PagoSuscripcionScreen extends StatefulWidget {
@@ -98,10 +98,16 @@ class _PagoSuscripcionScreenState extends State<PagoSuscripcionScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+        leadingWidth: 95,
+        leading: TextButton.icon(
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.only(left: 5, right: 8),
+            textStyle: const TextStyle(fontSize: 14),
+          ),
+          icon: const Icon(Icons.arrow_back_ios, size: 18, color: Colors.white),
+          label: const Text("ATRÁS", style: TextStyle(color: Colors.white)),
           onPressed: () {
-            // Regresar y abrir DashboardPasajero
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (_) => const DashboardPasajero()),
@@ -109,15 +115,21 @@ class _PagoSuscripcionScreenState extends State<PagoSuscripcionScreen> {
             );
           },
         ),
-        title: const Text(
-          'ZUVIROapps',
-          style: TextStyle(
-            color: Color(0xFF1476FF),
-            fontWeight: FontWeight.normal,
-            fontSize: 16,
-            letterSpacing: 1.1,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Text(
+              "ZUVIROapps",
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF1476FF),
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
+            ),
           ),
-        ),
+        ],
+        title: null,
         centerTitle: false,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -131,7 +143,7 @@ class _PagoSuscripcionScreenState extends State<PagoSuscripcionScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    "¿Cuántos meses quieres pagar?",
+                    "¿Cuántos meses desea pagar?",
                     style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                   const SizedBox(height: 14),
@@ -148,8 +160,8 @@ class _PagoSuscripcionScreenState extends State<PagoSuscripcionScreen> {
                     ),
                     validator: (value) {
                       final n = int.tryParse(value ?? '');
-                      if (n == null) return "Ingresa un número";
-                      if (n < 1 || n > 12) return "Sólo de 1 a 12 meses";
+                      if (n == null) return "Ingrese un número";
+                      if (n < 1 || n > 12) return "Solo de 1 a 12 meses";
                       return null;
                     },
                   ),
