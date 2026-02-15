@@ -4,6 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 
+// NO OLVIDES IMPORTAR TU DASHBOARD
+import 'dashboard_pasajero.dart';
+
 class PagoSuscripcionScreen extends StatefulWidget {
   const PagoSuscripcionScreen({Key? key}) : super(key: key);
 
@@ -95,22 +98,27 @@ class _PagoSuscripcionScreenState extends State<PagoSuscripcionScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        leadingWidth: 140,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 14.0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'ZUVIROapps',
-              style: TextStyle(
-                color: const Color(0xFF1476FF),
-                fontWeight: FontWeight.normal,
-                fontSize: 16,
-                letterSpacing: 1.1,
-              ),
-            ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () {
+            // Regresar y abrir DashboardPasajero
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const DashboardPasajero()),
+              (route) => false,
+            );
+          },
+        ),
+        title: const Text(
+          'ZUVIROapps',
+          style: TextStyle(
+            color: Color(0xFF1476FF),
+            fontWeight: FontWeight.normal,
+            fontSize: 16,
+            letterSpacing: 1.1,
           ),
         ),
+        centerTitle: false,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Padding(
