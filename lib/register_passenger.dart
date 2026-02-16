@@ -52,7 +52,7 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
   Future<bool> emailExisteEnBackend(String email) async {
     final response = await http.get(
       Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/auth/check-email?email=$email',
+        'https://graceful-balance-production-ef1d.up.railway.app/auth/check-email-pasajero?email=$email',
       ),
       headers: {'accept': 'application/json'},
     );
