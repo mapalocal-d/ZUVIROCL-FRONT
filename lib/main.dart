@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-// Importa tus pantallas
+// Importa todas tus pantallas
 import 'dashboard_conductor.dart';
 import 'dashboard_pasajero.dart';
 import 'register_passenger.dart';
@@ -13,6 +13,7 @@ import 'reset_password_confirm_passenger.dart';
 import 'reset_password_request_conductor.dart';
 import 'reset_password_confirm_conductor.dart';
 import 'root_screen.dart';
+import 'politica_legal.dart'; // <<---- IMPORTANTE
 
 void main() {
   runApp(const ZuviroApp());
@@ -126,7 +127,6 @@ class ZuviroApp extends StatelessWidget {
   }
 }
 
-// HomeScreen y botón de acceso rápido (puedes dejar igual que antes):
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -292,6 +292,41 @@ class HomeScreen extends StatelessWidget {
                     onPressed: () => _showResetOptions(context),
                   ),
                 ],
+              ),
+            ),
+            // Botón fijo abajo a la izquierda para políticas
+            Positioned(
+              left: 14,
+              bottom: 18,
+              child: SizedBox(
+                height: 40,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.black.withOpacity(0.3),
+                    foregroundColor: accent,
+                    minimumSize: const Size(140, 40),
+                  ),
+                  icon: const Icon(
+                    Icons.policy,
+                    size: 21,
+                    color: Color(0xFF50C878),
+                  ),
+                  label: const Text(
+                    "Política legal",
+                    style: TextStyle(
+                      color: Color(0xFF50C878),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PoliticaLegalScreen(),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
