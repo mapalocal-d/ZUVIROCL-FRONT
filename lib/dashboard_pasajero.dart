@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'perfil_pasajero.dart'; // Ruta a tu archivo de Mi Cuenta
-import 'logout_button.dart'; // Ruta correcta para tu logout
-import 'pagar_suscripcion_pasajero.dart'; // Asegúrate que aquí está PagoSuscripcionScreen
-import 'estado_suscripcion_pasajero.dart'; // Importa el widget del estado de suscripción
-import 'historial_pago_pasajero.dart'; // agrega tu screen de historial de pagos aquí
-import 'ayuda_soporte.dart'; // agrega tu screen de ayuda y soporte aquí
+import 'perfil_pasajero.dart';
+import 'logout_button.dart';
+import 'pagar_suscripcion_pasajero.dart';
+import 'estado_suscripcion_pasajero.dart';
+import 'historial_pago_pasajero.dart';
+import 'ayuda_soporte.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
 class DashboardPasajero extends StatefulWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
@@ -18,11 +20,42 @@ class DashboardPasajero extends StatefulWidget {
 
 class _DashboardPasajeroState extends State<DashboardPasajero> {
   late Future<Map<String, String>> _datosUsuarioFuture;
+  Position? _userPosition;
+  late GoogleMapController _mapController;
+  Set<Marker> _markers = {};
+  bool _loadingLocation = true;
 
   @override
   void initState() {
     super.initState();
     _datosUsuarioFuture = _getNombreEmail();
+    _loadCurrentLocation();
+  }
+
+  Future<void> _loadCurrentLocation() async {
+    LocationPermission permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      setState(() {
+        _loadingLocation = false;
+      });
+      return;
+    }
+    Position position = await Geolocator.getCurrentPosition();
+    setState(() {
+      _userPosition = position;
+      _loadingLocation = false;
+      _markers = {
+        Marker(
+          markerId: const MarkerId('me'),
+          position: LatLng(position.latitude, position.longitude),
+          infoWindow: const InfoWindow(title: 'Mi ubicación'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+        ),
+      };
+    });
   }
 
   Future<Map<String, String>> _getNombreEmail() async {
@@ -31,7 +64,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     String apellido = prefs.getString('apellido') ?? '';
     String email = prefs.getString('email') ?? '';
 
-    // Si falta alguno, consulta el endpoint y guarda los nuevos valores
     if (nombre.isEmpty || email.isEmpty) {
       final token = prefs.getString('access_token');
       if (token != null) {
@@ -171,9 +203,23 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
           },
         ),
       ),
-      body: const Center(
-        child: Text('Contenido principal del dashboard pasajero'),
-      ),
+      body: _loadingLocation
+          ? const Center(child: CircularProgressIndicator())
+          : _userPosition == null
+          ? const Center(child: Text("No se pudo obtener la ubicación."))
+          : GoogleMap(
+              onMapCreated: (controller) => _mapController = controller,
+              initialCameraPosition: CameraPosition(
+                target: LatLng(
+                  _userPosition!.latitude,
+                  _userPosition!.longitude,
+                ),
+                zoom: 15,
+              ),
+              markers: _markers,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+            ),
     );
   }
 }

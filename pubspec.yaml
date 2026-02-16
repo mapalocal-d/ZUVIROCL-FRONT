@@ -16,7 +16,9 @@ dependencies:
   google_fonts: ^8.0.1
   flutter_svg: ^2.0.10
   logger: 
-  url_launcher: ^6.2.5   # <-- Agregado, usa la última versión estable disponible
+  url_launcher: ^6.2.5
+  google_maps_flutter: ^2.5.0       # <-- AGREGADO
+  geolocator: ^10.0.0               # <-- AGREGADO
 
 dev_dependencies:
   flutter_test:
@@ -26,4 +28,4 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/mapa_demo_actualizado.svg   # Asegúrate que la ruta exista
+    - assets/mapa_demo_actualizado.svg
