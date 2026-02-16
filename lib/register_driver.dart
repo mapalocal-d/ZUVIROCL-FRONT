@@ -6,6 +6,28 @@ import 'politica_legal.dart'; // Importa la pantalla de políticas legales
 
 const emeraldGreen = Color(0xFF50C878);
 
+// Listas de validaciones ampliadas
+final List<String> dominiosProhibidos = [
+  'mailinator',
+  'yopmail',
+  'tempmail',
+  'guerrillamail',
+];
+final List<String> palabrasProhibidas = [
+  'admin',
+  'root',
+  'soporte',
+  'moderador',
+  'appcl',
+];
+final List<String> contrasenasDebiles = [
+  'password',
+  '123456',
+  'contraseña',
+  '12345678',
+  'qwerty',
+];
+
 class RegisterDriverScreen extends StatefulWidget {
   const RegisterDriverScreen({super.key});
 
@@ -18,6 +40,8 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
   bool _aceptaTerminos = false;
   bool _loading = false;
   String? _error;
+  String? _emailErrorText;
+  bool _checkingEmail = false;
 
   // Controladores
   final TextEditingController _nombreController = TextEditingController();
@@ -51,6 +75,54 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
         .replaceAll('ñ', 'n');
   }
 
+  // ========= VALIDACIÓN EMAIL EXISTE EN BACKEND =========
+  Future<bool> emailExisteEnBackend(String email) async {
+    final response = await http.get(
+      Uri.parse(
+        'https://graceful-balance-production-ef1d.up.railway.app/auth/check-email?email=$email',
+      ),
+      headers: {'accept': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      // El backend retorna un string: "EXISTS" o "AVAILABLE"
+      final String result = response.body.replaceAll('"', '').trim();
+      return result.toLowerCase().contains('exist'); // <= "EXISTS"
+    }
+    if (response.statusCode == 422) {
+      // Email mal formado
+      return false;
+    }
+    throw Exception('Error consultando disponibilidad');
+  }
+
+  void _onEmailChanged(String value) async {
+    final email = value.trim();
+    if (email.isEmpty) {
+      setState(() => _emailErrorText = "Ingresa tu email");
+      return;
+    }
+    if (!_validateFormatoEmail(email)) {
+      setState(() => _emailErrorText = "Formato de email inválido");
+      return;
+    }
+    // Dominio prohibido
+    if (dominiosProhibidos.any((d) => email.contains(d))) {
+      setState(() => _emailErrorText = "No se permiten emails temporales.");
+      return;
+    }
+
+    setState(() => _checkingEmail = true);
+    try {
+      bool exists = await emailExisteEnBackend(email);
+      setState(() {
+        _emailErrorText = exists ? "Este email ya está registrado" : null;
+      });
+    } catch (e) {
+      setState(() => _emailErrorText = "Error verificando email");
+    }
+    setState(() => _checkingEmail = false);
+  }
+
   // ----- Validadores -----
   String? _validateNombre(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
@@ -59,16 +131,12 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     if (nombre.length > 50) return "Máx 50 letras";
     if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(nombre))
       return "Solo letras y espacios";
-    final prohibidos = [
-      "admin",
-      "administrador",
-      "soporte",
-      "root",
-      "moderador",
-      "appcl",
-    ];
-    if (prohibidos.contains(nombre.toLowerCase()))
+    if (palabrasProhibidas.contains(nombre.toLowerCase()))
       return "Nombre reservado por el sistema";
+    if (RegExp(r"(.)\1{3,}").hasMatch(nombre))
+      return "No usar muchas repeticiones";
+    if (nombre == nombre.toUpperCase()) return "No todo en mayúsculas";
+    if (nombre == nombre.toLowerCase()) return "No todo en minúsculas";
     return null;
   }
 
@@ -79,39 +147,31 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     if (apellido.length > 50) return "Máx 50 letras";
     if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(apellido))
       return "Solo letras y espacios";
-    final prohibidos = [
-      "admin",
-      "administrador",
-      "soporte",
-      "root",
-      "moderador",
-      "appcl",
-    ];
-    if (prohibidos.contains(apellido.toLowerCase()))
+    if (palabrasProhibidas.contains(apellido.toLowerCase()))
       return "Apellido reservado por el sistema";
+    if (RegExp(r"(.)\1{3,}").hasMatch(apellido))
+      return "No usar muchas repeticiones";
+    if (apellido == apellido.toUpperCase()) return "No todo en mayúsculas";
+    if (apellido == apellido.toLowerCase()) return "No todo en minúsculas";
     return null;
   }
 
+  // Validación local de email (formato, dominio, caracteres)
+  bool _validateFormatoEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return false;
+    final email = value.trim();
+    if (email.contains(' ')) return false;
+    if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email)) return false;
+    if (dominiosProhibidos.any((d) => email.contains(d))) return false;
+    if (RegExp(r'[^\x00-\x7F]').hasMatch(email)) return false; // Emojis/raros
+    return true;
+  }
+
   String? _validateEmail(String? value) {
-    if (value == null || value.trim().isEmpty) return "Ingresa tu email";
-    final email = value.trim().toLowerCase();
-    if (email.contains(' '))
-      return "El correo electrónico no puede contener espacios.";
-    if (!email.contains('@')) return "Formato de email inválido";
-    final parts = email.split('@');
-    if (parts.length != 2) return "Email inválido (debe tener solo un @)";
-    final parte_local = parts[0];
-    final dominio = parts[1];
-    if (dominio.endsWith('.com.com') ||
-        dominio.endsWith('.cl.cl') ||
-        dominio.endsWith('.es.es'))
-      return "Dominio de email inválido. Verifica que esté escrito correctamente.";
-    if (email.contains('..'))
-      return "Email no puede contener puntos consecutivos.";
-    if (parte_local.startsWith('.') || parte_local.endsWith('.'))
-      return "La parte antes del @ no puede empezar ni terminar con punto.";
-    if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email))
-      return "Email inválido";
+    final email = value?.trim();
+    if (email == null || email.isEmpty) return "Ingresa tu email";
+    if (!_validateFormatoEmail(email)) return "Email inválido";
+    if (_emailErrorText != null) return _emailErrorText;
     return null;
   }
 
@@ -120,9 +180,20 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     if (value.length < 8) return "Mínimo 8 caracteres";
     if (value.length > 32) return "Máximo 32 caracteres";
     if (!RegExp(r'[A-Z]').hasMatch(value))
-      return "La contraseña debe contener al menos una letra mayúscula";
-    if (!RegExp(r'\d').hasMatch(value))
-      return "La contraseña debe contener al menos un número";
+      return "Debe tener una letra mayúscula";
+    if (!RegExp(r'[a-z]').hasMatch(value))
+      return "Debe tener una letra minúscula";
+    if (!RegExp(r'\d').hasMatch(value)) return "Debe tener un número";
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value))
+      return "Debe tener un símbolo (!@#\$...)";
+    if (contrasenasDebiles.any((p) => value.toLowerCase().contains(p)))
+      return "Contraseña demasiado fácil";
+    if (_nombreController.text.isNotEmpty &&
+        value.toLowerCase().contains(_nombreController.text.toLowerCase()))
+      return "No usar tu nombre como contraseña";
+    if (_emailController.text.isNotEmpty &&
+        value.toLowerCase().contains(_emailController.text.toLowerCase()))
+      return "No usar tu email como contraseña";
     return null;
   }
 
@@ -272,13 +343,11 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       final messenger = ScaffoldMessenger.of(context);
       if (resp.statusCode == 201) {
         final respBody = json.decode(resp.body);
-
         final accessToken = respBody['access_token'];
         if (accessToken != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('access_token', accessToken);
         }
-
         messenger.showSnackBar(
           const SnackBar(
             content: Text("¡Registro exitoso! Bienvenido conductor."),
@@ -286,14 +355,12 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
             duration: Duration(seconds: 2),
           ),
         );
-
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/dashboard_conductor');
         }
       } else {
         final respBody = json.decode(resp.body);
-
         setState(() {
           _error =
               (respBody['detail'] ?? "Registro fallido. Intenta nuevamente.")
@@ -350,14 +417,21 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                 _validateEmail,
                 helper: "Debe ser válido (ejemplo@correo.com)",
                 keyboardType: TextInputType.emailAddress,
+                errorText: _emailErrorText,
+                onChanged: _onEmailChanged,
               ),
+              if (_checkingEmail)
+                const Padding(
+                  padding: EdgeInsets.only(left: 10, top: 3, bottom: 3),
+                  child: LinearProgressIndicator(),
+                ),
               _buildField(
                 _passwordController,
                 'Contraseña',
                 _validatePassword,
                 obscure: true,
                 helper:
-                    "Debe tener entre 8 y 32 caracteres, al menos una mayúscula y un número.",
+                    "Debe tener entre 8 y 32 caracteres, mayúscula, minúscula, número y símbolo.",
               ),
               _buildField(
                 _confirmPasswordController,
@@ -647,6 +721,8 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     bool obscure = false,
     TextInputType? keyboardType,
     TextCapitalization textCapitalization = TextCapitalization.none,
+    String? errorText,
+    Function(String)? onChanged,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 7),
@@ -666,6 +742,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
             horizontal: 11,
           ),
           helperText: helper,
+          errorText: errorText,
           helperStyle: helper != null
               ? const TextStyle(color: emeraldGreen, fontSize: 13.5)
               : null,
@@ -676,6 +753,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
         textInputAction: TextInputAction.next,
         keyboardType: keyboardType,
         textCapitalization: textCapitalization,
+        onChanged: onChanged,
       ),
     );
   }

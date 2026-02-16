@@ -4,6 +4,28 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'politica_legal.dart'; // Importa la pantalla de Políticas
 
+const emeraldGreen = Color(0xFF50C878);
+final List<String> dominiosProhibidos = [
+  'mailinator',
+  'yopmail',
+  'tempmail',
+  'guerrillamail',
+];
+final List<String> palabrasProhibidas = [
+  'admin',
+  'root',
+  'soporte',
+  'moderador',
+  'appcl',
+];
+final List<String> contrasenasDebiles = [
+  'password',
+  '123456',
+  'contraseña',
+  '12345678',
+  'qwerty',
+];
+
 class RegisterPassengerScreen extends StatefulWidget {
   const RegisterPassengerScreen({super.key});
 
@@ -16,6 +38,8 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _aceptaTerminos = false;
   bool _loading = false;
+  String? _emailErrorText;
+  bool _checkingEmail = false;
 
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _apellidoController = TextEditingController();
@@ -24,29 +48,131 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
+  // ========= VALIDACIÓN EMAIL EXISTE EN BACKEND =========
+  Future<bool> emailExisteEnBackend(String email) async {
+    final response = await http.get(
+      Uri.parse(
+        'https://graceful-balance-production-ef1d.up.railway.app/auth/check-email?email=$email',
+      ),
+      headers: {'accept': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      // El backend retorna un string: "EXISTS" o "AVAILABLE"
+      final String result = response.body.replaceAll('"', '').trim();
+      return result.toLowerCase().contains('exist'); // "EXISTS"
+    }
+    if (response.statusCode == 422) {
+      // Email mal formado
+      return false;
+    }
+    throw Exception('Error consultando disponibilidad');
+  }
+
+  void _onEmailChanged(String value) async {
+    final email = value.trim();
+    if (email.isEmpty) {
+      setState(() => _emailErrorText = "Ingresa tu email");
+      return;
+    }
+    if (!_validateFormatoEmail(email)) {
+      setState(() => _emailErrorText = "Formato de email inválido");
+      return;
+    }
+    // Dominio prohibido
+    if (dominiosProhibidos.any((d) => email.contains(d))) {
+      setState(() => _emailErrorText = "No se permiten emails temporales.");
+      return;
+    }
+
+    setState(() => _checkingEmail = true);
+    try {
+      bool exists = await emailExisteEnBackend(email);
+      setState(() {
+        _emailErrorText = exists ? "Este email ya está registrado" : null;
+      });
+    } catch (e) {
+      setState(() => _emailErrorText = "Error verificando email");
+    }
+    setState(() => _checkingEmail = false);
+  }
+
   // ========= VALIDACIONES =========
   String? _validateNombre(String? value) {
-    // ... igual que tu código ...
+    if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
+    final nombre = value.trim();
+    if (nombre.length < 2) return "Debe tener al menos 2 letras";
+    if (nombre.length > 50) return "Máximo 50 letras";
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(nombre))
+      return "Solo letras y espacios";
+    if (palabrasProhibidas.contains(nombre.toLowerCase()))
+      return "Nombre reservado por el sistema";
+    if (RegExp(r"(.)\1{3,}").hasMatch(nombre))
+      return "No usar muchas repeticiones";
+    if (nombre == nombre.toUpperCase()) return "No todo en mayúsculas";
+    if (nombre == nombre.toLowerCase()) return "No todo en minúsculas";
     return null;
   }
 
   String? _validateApellido(String? value) {
-    // ... igual que tu código ...
+    if (value == null || value.trim().isEmpty) return "Ingresa tu apellido";
+    final apellido = value.trim();
+    if (apellido.length < 2) return "Debe tener al menos 2 letras";
+    if (apellido.length > 50) return "Máximo 50 letras";
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(apellido))
+      return "Solo letras y espacios";
+    if (palabrasProhibidas.contains(apellido.toLowerCase()))
+      return "Apellido reservado por el sistema";
+    if (RegExp(r"(.)\1{3,}").hasMatch(apellido))
+      return "No usar muchas repeticiones";
+    if (apellido == apellido.toUpperCase()) return "No todo en mayúsculas";
+    if (apellido == apellido.toLowerCase()) return "No todo en minúsculas";
     return null;
   }
 
+  // Validación local de email (formato, dominio, caracteres)
+  bool _validateFormatoEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return false;
+    final email = value.trim();
+    if (email.contains(' ')) return false;
+    if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email)) return false;
+    if (dominiosProhibidos.any((d) => email.contains(d))) return false;
+    if (RegExp(r'[^\x00-\x7F]').hasMatch(email)) return false; // Emojis/raros
+    return true;
+  }
+
   String? _validateEmail(String? value) {
-    // ... igual que tu código ...
+    final email = value?.trim();
+    if (email == null || email.isEmpty) return "Ingresa tu email";
+    if (!_validateFormatoEmail(email)) return "Email inválido";
+    if (_emailErrorText != null) return _emailErrorText;
     return null;
   }
 
   String? _validatePassword(String? value) {
-    // ... igual que tu código ...
+    if (value == null || value.isEmpty) return "Ingresa una contraseña";
+    if (value.length < 8) return "Mínimo 8 caracteres";
+    if (value.length > 32) return "Máximo 32 caracteres";
+    if (!RegExp(r'[A-Z]').hasMatch(value))
+      return "Debe tener una letra mayúscula";
+    if (!RegExp(r'[a-z]').hasMatch(value))
+      return "Debe tener una letra minúscula";
+    if (!RegExp(r'\d').hasMatch(value)) return "Debe tener un número";
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value))
+      return "Debe tener un símbolo (!@#\$...)";
+    if (contrasenasDebiles.any((p) => value.toLowerCase().contains(p)))
+      return "Contraseña demasiado fácil";
+    if (_nombreController.text.isNotEmpty &&
+        value.toLowerCase().contains(_nombreController.text.toLowerCase()))
+      return "No usar tu nombre como contraseña";
+    if (_emailController.text.isNotEmpty &&
+        value.toLowerCase().contains(_emailController.text.toLowerCase()))
+      return "No usar tu email como contraseña";
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
-    // ... igual que tu código ...
+    if (value == null || value != _passwordController.text)
+      return "Las contraseñas no coinciden";
     return null;
   }
 
@@ -133,8 +259,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const emeraldGreen = Color(0xFF50C878);
-
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -209,12 +333,19 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                   ),
                   helperText: "Debe ser válido (ejemplo@correo.com)",
                   helperStyle: TextStyle(color: emeraldGreen, fontSize: 13.5),
+                  errorText: _emailErrorText,
                 ),
                 style: const TextStyle(color: Colors.blue, fontSize: 15),
                 keyboardType: TextInputType.emailAddress,
                 validator: _validateEmail,
                 textInputAction: TextInputAction.next,
+                onChanged: _onEmailChanged,
               ),
+              if (_checkingEmail)
+                const Padding(
+                  padding: EdgeInsets.only(left: 10, top: 3, bottom: 3),
+                  child: LinearProgressIndicator(),
+                ),
               const SizedBox(height: 7),
               TextFormField(
                 controller: _passwordController,
@@ -232,7 +363,7 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                     horizontal: 11,
                   ),
                   helperText:
-                      "Debe tener entre 8 y 32 caracteres, al menos una mayúscula y un número.",
+                      "Debe tener entre 8 y 32 caracteres, mayúscula, minúscula, número y símbolo.",
                   helperStyle: TextStyle(color: emeraldGreen, fontSize: 13.5),
                 ),
                 style: const TextStyle(color: Colors.blue, fontSize: 15),
