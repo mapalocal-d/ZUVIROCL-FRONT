@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'politica_legal.dart'; // Importa la pantalla de políticas legales
 
 const emeraldGreen = Color(0xFF50C878);
 
@@ -288,7 +289,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
 
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
-          // NAVEGA AL DASHBOARD DE CONDUCTOR POR RUTA:
           Navigator.pushReplacementNamed(context, '/dashboard_conductor');
         }
       } else {
@@ -366,8 +366,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                 obscure: true,
                 helper: "Debe coincidir con tu contraseña.",
               ),
-
-              // --- Región Selector (con ayuda en verde) ---
               Padding(
                 padding: const EdgeInsets.only(bottom: 7),
                 child: Column(
@@ -418,7 +416,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                   ],
                 ),
               ),
-              // --- Ciudad Selector (con ayuda en verde) ---
               _loadingCities
                   ? const Padding(
                       padding: EdgeInsets.all(8),
@@ -483,7 +480,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                         ],
                       ),
                     ),
-              // --- Patente ---
               _buildField(
                 _patenteController,
                 'Patente',
@@ -491,7 +487,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                 textCapitalization: TextCapitalization.characters,
                 helper: "Solo letras mayúsculas y números",
               ),
-              // --- Líneas Selector (con ayuda en verde) ---
               _selectedCiudad == null
                   ? const SizedBox()
                   : _loadingLines
@@ -564,11 +559,31 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                     activeColor: Colors.blue,
                     checkColor: Colors.black,
                   ),
-                  const Expanded(
-                    child: Text(
-                      'Acepto los términos y condiciones',
-                      style: TextStyle(color: Colors.blue, fontSize: 14),
-                      softWrap: true,
+                  Expanded(
+                    child: Wrap(
+                      children: [
+                        const Text(
+                          'Acepto los ',
+                          style: TextStyle(color: Colors.blue, fontSize: 14),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PoliticaLegalScreen(),
+                            ),
+                          ),
+                          child: const Text(
+                            'términos y condiciones y política de privacidad',
+                            style: TextStyle(
+                              color: Color(0xFF50C878),
+                              decoration: TextDecoration.underline,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
