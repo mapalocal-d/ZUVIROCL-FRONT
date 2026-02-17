@@ -20,6 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  String _selectedRole = "pasajero"; // Default role
+
+  bool _showPassword = false;
 
   @override
   void dispose() {
@@ -29,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    FocusScope.of(context).unfocus(); // Quitar teclado
+    FocusScope.of(context).unfocus();
 
     if (!_formKey.currentState!.validate()) {
       return;
@@ -49,8 +52,9 @@ class _LoginScreenState extends State<LoginScreen> {
         url,
         headers: {"Content-Type": "application/x-www-form-urlencoded"},
         body: {
-          "username": _emailController.text.trim(),
+          "email": _emailController.text.trim(),
           "password": _passwordController.text,
+          "rol": _selectedRole,
         },
       );
 
@@ -203,17 +207,49 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _passwordController,
                 enabled: !_loading,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Contraseña',
-                  prefixIcon: Icon(Icons.lock),
+                  prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showPassword ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() => _showPassword = !_showPassword);
+                    },
+                  ),
                 ),
-                obscureText: true,
+                obscureText: !_showPassword,
                 validator: _validatePassword,
                 textInputAction: TextInputAction.done,
                 autofillHints: const [AutofillHints.password],
                 onFieldSubmitted: (_) {
                   if (!_loading) _login();
                 },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _selectedRole,
+                decoration: const InputDecoration(
+                  labelText: "Rol",
+                  prefixIcon: Icon(Icons.person),
+                ),
+                items: const [
+                  DropdownMenuItem(value: "pasajero", child: Text("Pasajero")),
+                  DropdownMenuItem(
+                    value: "conductor",
+                    child: Text("Conductor"),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedRole = value;
+                    });
+                  }
+                },
+                validator: (value) =>
+                    value == null || value.isEmpty ? "Selecciona el rol" : null,
               ),
               const SizedBox(height: 20),
               if (_error != null)
