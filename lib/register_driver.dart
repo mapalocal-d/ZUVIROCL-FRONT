@@ -6,7 +6,6 @@ import 'politica_legal.dart'; // Importa la pantalla de políticas legales
 
 const emeraldGreen = Color(0xFF50C878);
 
-// Listas de validaciones ampliadas
 final List<String> dominiosProhibidos = [
   'mailinator',
   'yopmail',
@@ -19,13 +18,6 @@ final List<String> palabrasProhibidas = [
   'soporte',
   'moderador',
   'appcl',
-];
-final List<String> contrasenasDebiles = [
-  'password',
-  '123456',
-  'contraseña',
-  '12345678',
-  'qwerty',
 ];
 
 class RegisterDriverScreen extends StatefulWidget {
@@ -42,8 +34,9 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
   String? _error;
   String? _emailErrorText;
   bool _checkingEmail = false;
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
 
-  // Controladores
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _apellidoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -52,7 +45,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       TextEditingController();
   final TextEditingController _patenteController = TextEditingController();
 
-  // Selectores
   String? _selectedRegion;
   String? _selectedCiudad;
   String? _selectedLinea;
@@ -84,12 +76,10 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       headers: {'accept': 'application/json'},
     );
     if (response.statusCode == 200) {
-      // El backend retorna un string: "EXISTS" o "AVAILABLE"
-      final String result = response.body.replaceAll('"', '').trim();
-      return result.toLowerCase().contains('exist'); // <= "EXISTS"
+      final body = json.decode(response.body);
+      return body["disponible"] == false;
     }
     if (response.statusCode == 422) {
-      // Email mal formado
       return false;
     }
     throw Exception('Error consultando disponibilidad');
@@ -105,12 +95,10 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       setState(() => _emailErrorText = "Formato de email inválido");
       return;
     }
-    // Dominio prohibido
     if (dominiosProhibidos.any((d) => email.contains(d))) {
       setState(() => _emailErrorText = "No se permiten emails temporales.");
       return;
     }
-
     setState(() => _checkingEmail = true);
     try {
       bool exists = await emailExisteEnBackend(email);
@@ -123,7 +111,8 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     setState(() => _checkingEmail = false);
   }
 
-  // ----- Validadores -----
+  // ========= VALIDACIONES EXTRAS DEL SCHEMA PYDANTIC =========
+
   String? _validateNombre(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
     final nombre = value.trim();
@@ -133,10 +122,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       return "Solo letras y espacios";
     if (palabrasProhibidas.contains(nombre.toLowerCase()))
       return "Nombre reservado por el sistema";
-    if (RegExp(r"(.)\1{3,}").hasMatch(nombre))
-      return "No usar muchas repeticiones";
-    if (nombre == nombre.toUpperCase()) return "No todo en mayúsculas";
-    if (nombre == nombre.toLowerCase()) return "No todo en minúsculas";
     return null;
   }
 
@@ -149,21 +134,27 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       return "Solo letras y espacios";
     if (palabrasProhibidas.contains(apellido.toLowerCase()))
       return "Apellido reservado por el sistema";
-    if (RegExp(r"(.)\1{3,}").hasMatch(apellido))
-      return "No usar muchas repeticiones";
-    if (apellido == apellido.toUpperCase()) return "No todo en mayúsculas";
-    if (apellido == apellido.toLowerCase()) return "No todo en minúsculas";
     return null;
   }
 
-  // Validación local de email (formato, dominio, caracteres)
   bool _validateFormatoEmail(String? value) {
     if (value == null || value.trim().isEmpty) return false;
-    final email = value.trim();
+    final email = value.trim().toLowerCase();
     if (email.contains(' ')) return false;
+    if (!email.contains('@')) return false;
+    final parts = email.split('@');
+    if (parts.length != 2) return false;
+    final parteLocal = parts[0];
+    final dominio = parts[1];
+    if (dominio.endsWith('.com.com') ||
+        dominio.endsWith('.cl.cl') ||
+        dominio.endsWith('.es.es'))
+      return false;
+    if (email.contains('..')) return false;
+    if (parteLocal.startsWith('.') || parteLocal.endsWith('.')) return false;
     if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email)) return false;
     if (dominiosProhibidos.any((d) => email.contains(d))) return false;
-    if (RegExp(r'[^\x00-\x7F]').hasMatch(email)) return false; // Emojis/raros
+    if (RegExp(r'[^\x00-\x7F]').hasMatch(email)) return false;
     return true;
   }
 
@@ -180,20 +171,9 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     if (value.length < 8) return "Mínimo 8 caracteres";
     if (value.length > 32) return "Máximo 32 caracteres";
     if (!RegExp(r'[A-Z]').hasMatch(value))
-      return "Debe tener una letra mayúscula";
-    if (!RegExp(r'[a-z]').hasMatch(value))
-      return "Debe tener una letra minúscula";
-    if (!RegExp(r'\d').hasMatch(value)) return "Debe tener un número";
-    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value))
-      return "Debe tener un símbolo (!@#\$...)";
-    if (contrasenasDebiles.any((p) => value.toLowerCase().contains(p)))
-      return "Contraseña demasiado fácil";
-    if (_nombreController.text.isNotEmpty &&
-        value.toLowerCase().contains(_nombreController.text.toLowerCase()))
-      return "No usar tu nombre como contraseña";
-    if (_emailController.text.isNotEmpty &&
-        value.toLowerCase().contains(_emailController.text.toLowerCase()))
-      return "No usar tu email como contraseña";
+      return "La contraseña debe contener al menos una letra mayúscula.";
+    if (!RegExp(r'\d').hasMatch(value))
+      return "La contraseña debe contener al menos un número.";
     return null;
   }
 
@@ -205,11 +185,15 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
 
   String? _validateRegion(String? value) {
     if (value == null || value.isEmpty) return "Elige una región";
+    if (value.length < 2) return "Debe tener al menos 2 letras";
+    if (value.length > 50) return "Máx 50 letras";
     return null;
   }
 
   String? _validateCiudad(String? value) {
     if (value == null || value.isEmpty) return "Elige una ciudad";
+    if (value.length < 2) return "Debe tener al menos 2 letras";
+    if (value.length > 40) return "Máx 40 letras";
     return null;
   }
 
@@ -225,6 +209,8 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
 
   String? _validateLinea(String? value) {
     if (value == null || value.isEmpty) return "Elige una línea o recorrido";
+    if (value.length < 1) return "Debe tener al menos 1 carácter";
+    if (value.length > 20) return "Máx 20 letras";
     return null;
   }
 
@@ -429,16 +415,40 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                 _passwordController,
                 'Contraseña',
                 _validatePassword,
-                obscure: true,
+                obscure: !_showPassword,
                 helper:
-                    "Debe tener entre 8 y 32 caracteres, mayúscula, minúscula, número y símbolo.",
+                    "Debe tener entre 8 y 32 caracteres, al menos un número y una mayúscula.",
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showPassword ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.blue,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _showPassword = !_showPassword;
+                    });
+                  },
+                ),
               ),
               _buildField(
                 _confirmPasswordController,
                 'Confirmar contraseña',
                 _validateConfirmPassword,
-                obscure: true,
+                obscure: !_showConfirmPassword,
                 helper: "Debe coincidir con tu contraseña.",
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showConfirmPassword
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: Colors.blue,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _showConfirmPassword = !_showConfirmPassword;
+                    });
+                  },
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 7),
@@ -723,6 +733,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     TextCapitalization textCapitalization = TextCapitalization.none,
     String? errorText,
     Function(String)? onChanged,
+    Widget? suffixIcon,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 7),
@@ -746,6 +757,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
           helperStyle: helper != null
               ? const TextStyle(color: emeraldGreen, fontSize: 13.5)
               : null,
+          suffixIcon: suffixIcon,
         ),
         style: const TextStyle(color: Colors.blue, fontSize: 15),
         obscureText: obscure,
