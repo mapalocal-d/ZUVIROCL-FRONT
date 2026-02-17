@@ -16,10 +16,10 @@
         android:label="zuvirocl_app"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- Google Maps API key (coloca tu clave aquí) -->
+        <!-- Google Maps API key (tu nueva clave aquí) -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAqjaHcfrQZkd_NfpP_cGbzCKeNkp2rbTw"/>
+            android:value="AIzaSyBUbQk07WHHLeDBZmHMDa2rNZId7yNBM3U"/>
 
         <activity
             android:name=".MainActivity"
@@ -31,7 +31,7 @@
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <category android:name="android.intent.category.LaunchER"/>
             </intent-filter>
         </activity>
         <!-- Otros servicios/meta-data si los necesitas -->
