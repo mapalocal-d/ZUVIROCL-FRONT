@@ -20,6 +20,7 @@ class DashboardPasajero extends StatefulWidget {
 }
 
 class _DashboardPasajeroState extends State<DashboardPasajero> {
+  // Controladores y estado
   late Future<Map<String, String>> _datosUsuarioFuture;
   Position? _userPosition;
   GoogleMapController? _mapController;
@@ -34,6 +35,11 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   List<dynamic> _ciudades = [];
   List<dynamic> _lineas = [];
 
+  // Constantes
+  static const String _baseUrl =
+      'https://graceful-balance-production-ef1d.up.railway.app';
+  static const Duration _timeout = Duration(seconds: 15);
+
   @override
   void initState() {
     super.initState();
@@ -42,17 +48,16 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     _cargarConfiguracion();
   }
 
-  // Cargar regiones y ciudades desde el backend
+  // ========== CARGA DE CONFIGURACIÓN ==========
+
   Future<void> _cargarConfiguracion() async {
     try {
       final response = await http
           .get(
-            Uri.parse(
-              'https://graceful-balance-production-ef1d.up.railway.app/config/cities',
-            ),
+            Uri.parse('$_baseUrl/config/cities'),
             headers: {'Accept': 'application/json'},
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(_timeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -66,16 +71,15 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     }
   }
 
-  // Cargar líneas según la ciudad seleccionada
   Future<void> _cargarLineas(String ciudad) async {
     try {
       final uri = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/config/lines',
+        '$_baseUrl/config/lines',
       ).replace(queryParameters: {'ciudad': ciudad});
 
       final response = await http
           .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 10));
+          .timeout(_timeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -88,9 +92,12 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     }
   }
 
+  // ========== UBICACIÓN ==========
+
   Future<void> _loadCurrentLocation() async {
     try {
       LocationPermission permission = await Geolocator.requestPermission();
+
       if (permission == LocationPermission.denied) {
         setState(() {
           _loadingLocation = false;
@@ -100,6 +107,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
         _mostrarMensaje("Permiso de ubicación denegado.");
         return;
       }
+
       if (permission == LocationPermission.deniedForever) {
         setState(() {
           _loadingLocation = false;
@@ -146,12 +154,12 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     });
   }
 
-  // Mostrar BottomSheet con selectores en cascada
+  // ========== BÚSQUEDA DE CONDUCTORES ==========
+
   void _mostrarBuscadorConductores() {
     String? regionSeleccionada;
     String? ciudadSeleccionada;
     String? lineaSeleccionada;
-
     List<dynamic> ciudadesFiltradas = [];
     List<dynamic> lineasDisponibles = [];
 
@@ -173,180 +181,212 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                 left: 20,
                 right: 20,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+              child: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.8,
                   ),
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    'Buscar Colectivo',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Selecciona tu ubicación y la línea que necesitas',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Selector de Región
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: 'Región',
-                      prefixIcon: const Icon(Icons.map),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                    ),
-                    value: regionSeleccionada,
-                    hint: const Text('Selecciona una región'),
-                    items: _regiones.map<DropdownMenuItem<String>>((region) {
-                      return DropdownMenuItem<String>(
-                        value: region['codigo'],
-                        child: Text('${region['codigo']}: ${region['nombre']}'),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setModalState(() {
-                        regionSeleccionada = value;
-                        ciudadSeleccionada = null;
-                        lineaSeleccionada = null;
-                        lineasDisponibles = [];
-                        ciudadesFiltradas = _ciudades
-                            .where((c) => c['codigo_region'] == value)
-                            .toList();
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Selector de Ciudad
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: 'Ciudad',
-                      prefixIcon: const Icon(Icons.location_city),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                    ),
-                    value: ciudadSeleccionada,
-                    hint: const Text('Selecciona una ciudad'),
-                    items: ciudadesFiltradas.map<DropdownMenuItem<String>>((
-                      ciudad,
-                    ) {
-                      return DropdownMenuItem<String>(
-                        value: ciudad['nombre'],
-                        child: Text(ciudad['nombre']),
-                      );
-                    }).toList(),
-                    onChanged: regionSeleccionada == null
-                        ? null
-                        : (value) async {
-                            setModalState(() {
-                              ciudadSeleccionada = value;
-                              lineaSeleccionada = null;
-                            });
-                            if (value != null) {
-                              await _cargarLineas(value);
-                              setModalState(() {
-                                lineasDisponibles = _lineas;
-                              });
-                            }
-                          },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Selector de Línea
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: 'Línea de colectivo',
-                      prefixIcon: const Icon(Icons.directions_bus),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                    ),
-                    value: lineaSeleccionada,
-                    hint: const Text('Selecciona una línea'),
-                    items: lineasDisponibles.map<DropdownMenuItem<String>>((
-                      linea,
-                    ) {
-                      return DropdownMenuItem<String>(
-                        value: linea['id'],
-                        child: Text(
-                          '${linea['nombre']} - ${linea['descripcion']}',
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Indicador visual
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: ciudadSeleccionada == null
-                        ? null
-                        : (value) {
-                            setModalState(() => lineaSeleccionada = value);
-                          },
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Botón Buscar
-                  ElevatedButton.icon(
-                    onPressed: lineaSeleccionada == null || _buscandoConductores
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            _buscarConductores(
-                              linea: lineaSeleccionada!,
-                              region: regionSeleccionada,
-                              ciudad: ciudadSeleccionada,
-                            );
-                          },
-                    icon: _buscandoConductores
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.search),
-                    label: Text(
-                      _buscandoConductores
-                          ? 'Buscando...'
-                          : 'Buscar conductores',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
+                      const SizedBox(height: 20),
 
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancelar'),
+                      const Text(
+                        'Buscar Colectivo',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Selecciona tu ubicación y la línea que necesitas',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Selector de Región
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Región',
+                          prefixIcon: const Icon(Icons.map),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        value: regionSeleccionada,
+                        hint: const Text('Selecciona una región'),
+                        items: _regiones.map<DropdownMenuItem<String>>((
+                          region,
+                        ) {
+                          return DropdownMenuItem<String>(
+                            value: region['codigo'],
+                            child: Text(
+                              '${region['codigo']}: ${region['nombre']}',
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setModalState(() {
+                            regionSeleccionada = value;
+                            ciudadSeleccionada = null;
+                            lineaSeleccionada = null;
+                            lineasDisponibles = [];
+                            ciudadesFiltradas = _ciudades
+                                .where((c) => c['codigo_region'] == value)
+                                .toList();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Selector de Ciudad
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Ciudad',
+                          prefixIcon: const Icon(Icons.location_city),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        value: ciudadSeleccionada,
+                        hint: const Text('Selecciona una ciudad'),
+                        items: ciudadesFiltradas.map<DropdownMenuItem<String>>((
+                          ciudad,
+                        ) {
+                          return DropdownMenuItem<String>(
+                            value: ciudad['nombre'],
+                            child: Text(ciudad['nombre']),
+                          );
+                        }).toList(),
+                        onChanged: regionSeleccionada == null
+                            ? null
+                            : (value) async {
+                                setModalState(() {
+                                  ciudadSeleccionada = value;
+                                  lineaSeleccionada = null;
+                                });
+                                if (value != null) {
+                                  await _cargarLineas(value);
+                                  setModalState(() {
+                                    lineasDisponibles = _lineas;
+                                  });
+                                }
+                              },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Selector de Línea
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Línea de colectivo',
+                          prefixIcon: const Icon(Icons.directions_bus),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        value: lineaSeleccionada,
+                        hint: const Text('Selecciona una línea'),
+                        items: lineasDisponibles.map<DropdownMenuItem<String>>((
+                          linea,
+                        ) {
+                          return DropdownMenuItem<String>(
+                            value: linea['id'],
+                            child: Text(
+                              '${linea['nombre']} - ${linea['descripcion']}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: ciudadSeleccionada == null
+                            ? null
+                            : (value) {
+                                setModalState(() => lineaSeleccionada = value);
+                              },
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Botón Buscar - CON SIZEDBOX
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed:
+                              lineaSeleccionada == null || _buscandoConductores
+                              ? null
+                              : () {
+                                  Navigator.pop(context);
+                                  _buscarConductores(
+                                    linea: lineaSeleccionada!,
+                                    region: regionSeleccionada,
+                                    ciudad: ciudadSeleccionada,
+                                  );
+                                },
+                          icon: _buscandoConductores
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.search),
+                          label: Text(
+                            _buscandoConductores
+                                ? 'Buscando...'
+                                : 'Buscar conductores',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Botón Cancelar - CON SIZEDBOX
+                      SizedBox(
+                        width: double.infinity,
+                        height: 45,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text(
+                            'Cancelar',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             );
           },
@@ -384,7 +424,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
       };
 
       final uri = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/geo/nearby-drivers',
+        '$_baseUrl/geo/nearby-drivers',
       ).replace(queryParameters: queryParams);
 
       final response = await http
@@ -395,7 +435,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
               'Accept': 'application/json',
             },
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(_timeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -521,6 +561,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   void _mostrarDetalleConductor(dynamic conductor) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
@@ -529,97 +570,105 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.blue[100],
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    child: const Icon(
-                      Icons.directions_bus,
-                      color: Colors.blue,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Línea ${conductor['linea']}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${conductor['ciudad']}, ${conductor['region']}',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _filaInformacion(
-                Icons.social_distance,
-                'Distancia',
-                '${conductor['distancia_km']} km',
-              ),
-              _filaInformacion(
-                Icons.timer,
-                'Tiempo estimado',
-                '~${conductor['tiempo_llegada_estimado_min']} min',
-              ),
-              _filaInformacion(
-                Icons.local_gas_station,
-                'Estado vehículo',
-                conductor['estado_vehiculo'],
-              ),
-              _filaInformacion(
-                Icons.update,
-                'Última actualización',
-                conductor['actualizado_recientemente']
-                    ? 'Hace instantes'
-                    : 'Hace ${conductor['segundos_desde_actualizacion']} segundos',
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _mostrarMensaje('Solicitud enviada al conductor');
-                  },
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text('Solicitar colectivo'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.directions_bus,
+                        color: Colors.blue,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Línea ${conductor['linea']}',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${conductor['ciudad']}, ${conductor['region']}',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _filaInformacion(
+                  Icons.social_distance,
+                  'Distancia',
+                  '${conductor['distancia_km']} km',
+                ),
+                _filaInformacion(
+                  Icons.timer,
+                  'Tiempo estimado',
+                  '~${conductor['tiempo_llegada_estimado_min']} min',
+                ),
+                _filaInformacion(
+                  Icons.local_gas_station,
+                  'Estado vehículo',
+                  conductor['estado_vehiculo'],
+                ),
+                _filaInformacion(
+                  Icons.update,
+                  'Última actualización',
+                  conductor['actualizado_recientemente']
+                      ? 'Hace instantes'
+                      : 'Hace ${conductor['segundos_desde_actualizacion']} segundos',
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _mostrarMensaje('Solicitud enviada al conductor');
+                    },
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text(
+                      'Solicitar colectivo',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -637,14 +686,19 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
             '$etiqueta: ',
             style: TextStyle(color: Colors.grey[600], fontSize: 14),
           ),
-          Text(
-            valor,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          Expanded(
+            child: Text(
+              valor,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
     );
   }
+
+  // ========== DATOS DE USUARIO ==========
 
   Future<Map<String, String>> _getNombreEmail() async {
     final prefs = await SharedPreferences.getInstance();
@@ -656,9 +710,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
       final token = prefs.getString('access_token');
       if (token != null) {
         try {
-          final url = Uri.parse(
-            'https://graceful-balance-production-ef1d.up.railway.app/users/me',
-          );
+          final url = Uri.parse('$_baseUrl/users/me');
           final resp = await http.get(
             url,
             headers: {
@@ -708,13 +760,10 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   }
 
   void _mostrarMensaje(String mensaje) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(mensaje)));
-      }
-    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(mensaje)));
   }
 
   @override
