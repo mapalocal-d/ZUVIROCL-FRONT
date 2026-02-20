@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:diacritic/diacritic.dart'; // Necesitarás agregar esta dependencia
 
 class DashboardPasajero extends StatefulWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
@@ -34,6 +35,25 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   List<dynamic> _regiones = [];
   List<dynamic> _ciudades = [];
 
+  // Colores personalizados para regiones (más oscuros y legibles)
+  final Map<String, Color> _coloresRegion = {
+    'II': const Color(0xFF1565C0), // Azul oscuro
+    'III': const Color(0xFF2E7D32), // Verde oscuro
+    'IV': const Color(0xFF6A1B9A), // Púrpura oscuro
+    'V': const Color(0xFFC62828), // Rojo oscuro
+    'VI': const Color(0xFFEF6C00), // Naranja oscuro
+    'VII': const Color(0xFF00695C), // Verde azulado oscuro
+    'VIII': const Color(0xFFAD1457), // Rosa oscuro
+    'IX': const Color(0xFF4527A0), // Índigo oscuro
+    'X': const Color(0xFF263238), // Gris azulado oscuro
+    'XI': const Color(0xFF3E2723), // Marrón oscuro
+    'XII': const Color(0xFF0D47A1), // Azul marino
+    'RM': const Color(0xFFB71C1C), // Rojo oscuro
+    'XIV': const Color(0xFF1B5E20), // Verde bosque
+    'XV': const Color(0xFF4A148C), // Púrpura intenso
+    'XVI': const Color(0xFF827717), // Verde oliva
+  };
+
   // Constantes
   static const String _baseUrl =
       'https://graceful-balance-production-ef1d.up.railway.app';
@@ -45,6 +65,13 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     _datosUsuarioFuture = _getNombreEmail();
     _loadCurrentLocation();
     _cargarConfiguracion();
+  }
+
+  // ========== UTILIDADES ==========
+
+  /// Normaliza el nombre de ciudad para el backend (minúsculas, sin acentos)
+  String _normalizarCiudad(String ciudad) {
+    return removeDiacritics(ciudad).toLowerCase().trim();
   }
 
   // ========== CONFIGURACIÓN ==========
@@ -72,9 +99,14 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
   Future<List<dynamic>> _cargarLineas(String ciudad) async {
     try {
+      // CORRECCIÓN: Normalizar el nombre de ciudad antes de enviar
+      final ciudadNormalizada = _normalizarCiudad(ciudad);
+
       final uri = Uri.parse(
         '$_baseUrl/config/lines',
-      ).replace(queryParameters: {'ciudad': ciudad});
+      ).replace(queryParameters: {'ciudad': ciudadNormalizada});
+
+      debugPrint('Cargando líneas para ciudad: $ciudadNormalizada');
 
       final response = await http
           .get(uri, headers: {'Accept': 'application/json'})
@@ -82,7 +114,11 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['lineas'] ?? [];
+        final lineas = data['lineas'] ?? [];
+        debugPrint('Líneas encontradas: ${lineas.length}');
+        return lineas;
+      } else {
+        debugPrint('Error ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       debugPrint('Error cargando líneas: $e');
@@ -218,7 +254,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Selector de Región
+                      // Selector de Región CON COLORES OSCUROS
                       DropdownButtonFormField<String>(
                         isExpanded: true,
                         decoration: InputDecoration(
@@ -235,10 +271,37 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                         items: _regiones.map<DropdownMenuItem<String>>((
                           region,
                         ) {
+                          final color =
+                              _coloresRegion[region['codigo']] ??
+                              const Color(
+                                0xFF424242,
+                              ); // Gris oscuro por defecto
+
                           return DropdownMenuItem<String>(
                             value: region['codigo'],
-                            child: Text(
-                              '${region['codigo']}: ${region['nombre']}',
+                            child: Row(
+                              children: [
+                                // Indicador de color
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${region['codigo']}: ${region['nombre']}',
+                                    style: TextStyle(
+                                      color:
+                                          color, // Color oscuro para el texto
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           );
                         }).toList(),
@@ -275,7 +338,13 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                         ) {
                           return DropdownMenuItem<String>(
                             value: ciudad['nombre'],
-                            child: Text(ciudad['nombre']),
+                            child: Text(
+                              ciudad['nombre'],
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           );
                         }).toList(),
                         onChanged: regionSeleccionada == null
@@ -335,6 +404,10 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                               child: Text(
                                 '${linea['nombre']} - ${linea['descripcion']}',
                                 overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             );
                           }).toList(),
@@ -470,17 +543,25 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
         throw Exception('No hay sesión activa');
       }
 
+      // CORRECCIÓN: Normalizar ciudad para la búsqueda también
+      final ciudadNormalizada = ciudad != null
+          ? _normalizarCiudad(ciudad)
+          : null;
+
       final queryParams = {
         'linea': linea,
         'radio_km': '7',
         'solo_activos': 'true',
         if (region != null && region.isNotEmpty) 'region': region,
-        if (ciudad != null && ciudad.isNotEmpty) 'ciudad': ciudad,
+        if (ciudadNormalizada != null && ciudadNormalizada.isNotEmpty)
+          'ciudad': ciudadNormalizada,
       };
 
       final uri = Uri.parse(
         '$_baseUrl/geo/nearby-drivers',
       ).replace(queryParameters: queryParams);
+
+      debugPrint('Buscando conductores con params: $queryParams');
 
       final response = await http
           .get(

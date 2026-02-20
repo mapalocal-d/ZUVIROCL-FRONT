@@ -20,6 +20,7 @@ dependencies:
   google_maps_flutter: ^2.5.0       # <-- AGREGADO
   geolocator: ^10.0.0               # <-- AGREGADO
   permission_handler: ^11.0.1       # <-- AGREGADO para abrir ajustes
+  diacritic: ^0.1.5                 # <-- AGREGADO para normalizar ciudades
 
 dev_dependencies:
   flutter_test:
