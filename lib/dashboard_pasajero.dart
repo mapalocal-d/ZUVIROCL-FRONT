@@ -20,7 +20,7 @@ class DashboardPasajero extends StatefulWidget {
 }
 
 class _DashboardPasajeroState extends State<DashboardPasajero> {
-  // Controladores y estado
+  // Estado principal
   late Future<Map<String, String>> _datosUsuarioFuture;
   Position? _userPosition;
   GoogleMapController? _mapController;
@@ -33,7 +33,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   // Datos para selectores
   List<dynamic> _regiones = [];
   List<dynamic> _ciudades = [];
-  List<dynamic> _lineas = [];
 
   // Constantes
   static const String _baseUrl =
@@ -48,7 +47,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     _cargarConfiguracion();
   }
 
-  // ========== CARGA DE CONFIGURACIÓN ==========
+  // ========== CONFIGURACIÓN ==========
 
   Future<void> _cargarConfiguracion() async {
     try {
@@ -71,7 +70,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     }
   }
 
-  Future<void> _cargarLineas(String ciudad) async {
+  Future<List<dynamic>> _cargarLineas(String ciudad) async {
     try {
       final uri = Uri.parse(
         '$_baseUrl/config/lines',
@@ -83,13 +82,12 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          _lineas = data['lineas'] ?? [];
-        });
+        return data['lineas'] ?? [];
       }
     } catch (e) {
       debugPrint('Error cargando líneas: $e');
     }
+    return [];
   }
 
   // ========== UBICACIÓN ==========
@@ -162,6 +160,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     String? lineaSeleccionada;
     List<dynamic> ciudadesFiltradas = [];
     List<dynamic> lineasDisponibles = [];
+    bool cargandoLineas = false;
 
     showModalBottomSheet(
       context: context,
@@ -184,7 +183,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
               child: SingleChildScrollView(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.8,
+                    maxHeight: MediaQuery.of(context).size.height * 0.85,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -285,51 +284,102 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                                 setModalState(() {
                                   ciudadSeleccionada = value;
                                   lineaSeleccionada = null;
+                                  cargandoLineas = true;
+                                  lineasDisponibles = [];
                                 });
+
                                 if (value != null) {
-                                  await _cargarLineas(value);
+                                  final lineas = await _cargarLineas(value);
                                   setModalState(() {
-                                    lineasDisponibles = _lineas;
+                                    lineasDisponibles = lineas;
+                                    cargandoLineas = false;
                                   });
                                 }
                               },
                       ),
                       const SizedBox(height: 16),
 
-                      // Selector de Línea
-                      DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: 'Línea de colectivo',
-                          prefixIcon: const Icon(Icons.directions_bus),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                        value: lineaSeleccionada,
-                        hint: const Text('Selecciona una línea'),
-                        items: lineasDisponibles.map<DropdownMenuItem<String>>((
-                          linea,
-                        ) {
-                          return DropdownMenuItem<String>(
-                            value: linea['id'],
-                            child: Text(
-                              '${linea['nombre']} - ${linea['descripcion']}',
-                              overflow: TextOverflow.ellipsis,
+                      // Indicador de carga
+                      if (cargandoLineas)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             ),
-                          );
-                        }).toList(),
-                        onChanged: ciudadSeleccionada == null
-                            ? null
-                            : (value) {
-                                setModalState(() => lineaSeleccionada = value);
-                              },
-                      ),
+                          ),
+                        ),
+
+                      // Selector de Línea
+                      if (!cargandoLineas && lineasDisponibles.isNotEmpty)
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: 'Línea de colectivo',
+                            prefixIcon: const Icon(Icons.directions_bus),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                          ),
+                          value: lineaSeleccionada,
+                          hint: const Text('Selecciona una línea'),
+                          items: lineasDisponibles.map<DropdownMenuItem<String>>((
+                            linea,
+                          ) {
+                            return DropdownMenuItem<String>(
+                              value: linea['id'],
+                              child: Text(
+                                '${linea['nombre']} - ${linea['descripcion']}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setModalState(() => lineaSeleccionada = value);
+                          },
+                        ),
+
+                      // Sin líneas disponibles
+                      if (!cargandoLineas &&
+                          ciudadSeleccionada != null &&
+                          lineasDisponibles.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.orange[700],
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'No hay líneas disponibles para $ciudadSeleccionada',
+                                    style: TextStyle(
+                                      color: Colors.orange[800],
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
                       const SizedBox(height: 24),
 
-                      // Botón Buscar - CON SIZEDBOX
+                      // Botón Buscar - AZUL OSCURO
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -354,25 +404,30 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.search),
+                              : const Icon(Icons.search, color: Colors.white),
                           label: Text(
                             _buscandoConductores
                                 ? 'Buscando...'
                                 : 'Buscar conductores',
-                            style: const TextStyle(fontSize: 16),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.blue[800],
+                            disabledBackgroundColor: Colors.blue[200],
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            elevation: 2,
                           ),
                         ),
                       ),
                       const SizedBox(height: 12),
 
-                      // Botón Cancelar - CON SIZEDBOX
+                      // Botón Cancelar
                       SizedBox(
                         width: double.infinity,
                         height: 45,
@@ -653,17 +708,21 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                       Navigator.pop(context);
                       _mostrarMensaje('Solicitud enviada al conductor');
                     },
-                    icon: const Icon(Icons.check_circle),
+                    icon: const Icon(Icons.check_circle, color: Colors.white),
                     label: const Text(
                       'Solicitar colectivo',
-                      style: TextStyle(fontSize: 16),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.blue[800],
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 2,
                     ),
                   ),
                 ),
@@ -944,16 +1003,27 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
         onPressed: _buscandoConductores ? null : _mostrarBuscadorConductores,
         icon: _buscandoConductores
             ? const SizedBox(
-                width: 20,
-                height: 20,
+                width: 24,
+                height: 24,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2,
+                  strokeWidth: 3,
                   color: Colors.white,
                 ),
               )
-            : const Icon(Icons.search),
-        label: Text(_buscandoConductores ? 'Buscando...' : 'Buscar colectivo'),
-        backgroundColor: _buscandoConductores ? Colors.grey : Colors.blue,
+            : const Icon(Icons.search, color: Colors.white, size: 28),
+        label: Text(
+          _buscandoConductores ? 'Buscando...' : 'Buscar colectivo',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        backgroundColor: _buscandoConductores
+            ? Colors.blue[600]
+            : Colors.blue[800],
+        disabledElevation: 0,
+        elevation: 4,
       ),
     );
   }
