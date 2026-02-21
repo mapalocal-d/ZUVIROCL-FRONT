@@ -6,6 +6,8 @@ import 'package:logger/logger.dart';
 
 final logger = Logger();
 
+const String apiBase = 'https://web-production-ba98d.up.railway.app';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -20,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedRole = "pasajero"; // Default role
+  String _selectedRole = "pasajero";
 
   bool _showPassword = false;
 
@@ -34,28 +36,24 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
 
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _loading = true;
       _error = null;
     });
 
-    final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/login',
-    );
+    final url = Uri.parse('$apiBase/auth/login');
 
     try {
       final resp = await http.post(
         url,
-        headers: {"Content-Type": "application/x-www-form-urlencoded"},
-        body: {
-          "email": _emailController.text.trim(),
-          "password": _passwordController.text,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "correo": _emailController.text.trim(),
+          "contrasena": _passwordController.text,
           "rol": _selectedRole,
-        },
+        }),
       );
 
       logger.i('STATUS: ${resp.statusCode}');
@@ -64,17 +62,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
 
-        // ===== GUARDAR EL TOKEN Y EL ROL EN DISCO =====
         final accessToken = data['access_token'];
-        final userData = data['user_data'];
         if (accessToken != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('access_token', accessToken);
-
-          // Guardar también el rol para navegación automática posterior
-          if (userData != null && userData['rol'] != null) {
-            await prefs.setString('rol', userData['rol'].toString());
-          }
+          await prefs.setString('rol', _selectedRole);
         } else {
           setState(() {
             _error = "Login exitoso pero token no recibido.";
@@ -82,27 +74,20 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
-        // Limpiar campos tras login exitoso
         _emailController.clear();
         _passwordController.clear();
 
-        String? rol = userData != null ? userData['rol'] : null;
-
-        // Avisa éxito y navega al dashboard correcto según rol
         if (!mounted) return;
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('Login exitoso'),
-            content: userData?['email'] != null
-                ? Text("Bienvenido: ${userData['email']}")
-                : const Text("Bienvenido"),
+            content: Text("Bienvenido"),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  // Cambia el dashboard según el rol:
-                  if (rol == "conductor") {
+                  if (_selectedRole == "conductor") {
                     Navigator.of(
                       context,
                     ).pushReplacementNamed('/dashboard_conductor');
@@ -133,6 +118,9 @@ class _LoginScreenState extends State<LoginScreen> {
             case 422:
               _error = "Faltan datos o son inválidos.";
               break;
+            case 429:
+              _error = "Demasiados intentos. Intenta más tarde.";
+              break;
             default:
               _error = detail ?? "Error de autenticación";
           }
@@ -151,33 +139,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String? _validateEmail(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return "Ingresa tu email";
-    }
+    if (value == null || value.trim().isEmpty) return "Ingresa tu email";
     final email = value.trim();
     final emailRegExp = RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$");
-    if (!emailRegExp.hasMatch(email)) {
-      return "Email inválido";
-    }
-    if (email.contains(' ')) {
-      return "Sin espacios en email";
-    }
-    if (email.length > 50) {
-      return "Email demasiado largo";
-    }
+    if (!emailRegExp.hasMatch(email)) return "Email inválido";
+    if (email.contains(' ')) return "Sin espacios en email";
+    if (email.length > 50) return "Email demasiado largo";
     return null;
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return "Ingresa tu contraseña";
-    }
-    if (value.contains(' ')) {
-      return "Sin espacios en contraseña";
-    }
-    if (value.length < 8 || value.length > 32) {
+    if (value == null || value.isEmpty) return "Ingresa tu contraseña";
+    if (value.contains(' ')) return "Sin espacios en contraseña";
+    if (value.length < 8 || value.length > 32)
       return "Debe tener entre 8 y 32 caracteres";
-    }
     return null;
   }
 
@@ -242,11 +217,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
                 onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedRole = value;
-                    });
-                  }
+                  if (value != null) setState(() => _selectedRole = value);
                 },
                 validator: (value) =>
                     value == null || value.isEmpty ? "Selecciona el rol" : null,
