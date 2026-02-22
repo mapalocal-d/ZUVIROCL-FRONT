@@ -11,6 +11,9 @@ import 'reset_password_request.dart';
 import 'root_screen.dart';
 import 'politica_legal.dart';
 
+/// Llave global de navegación para redirigir desde cualquier parte (ej: sesión expirada)
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() {
   runApp(const ZuviroApp());
 }
@@ -27,6 +30,7 @@ class ZuviroApp extends StatelessWidget {
     const Color textColor = Color(0xFFE3F2FD);
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'ZUVIROCL',
       theme: ThemeData(
