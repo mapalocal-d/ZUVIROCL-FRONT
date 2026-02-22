@@ -229,10 +229,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
 
     try {
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 5),
-        ),
+        desiredAccuracy: LocationAccuracy.high,
       );
       setState(() {
         _userPosition = position;

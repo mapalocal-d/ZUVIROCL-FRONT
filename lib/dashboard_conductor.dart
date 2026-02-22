@@ -5,6 +5,7 @@ import 'estado_suscripcion_conductor.dart';
 import 'historial_pago_conductor.dart';
 import 'ayuda_soporte.dart';
 import 'logout_button.dart';
+import 'sesiones_activas.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -41,7 +42,7 @@ class _DashboardConductorState extends State<DashboardConductor>
   static const int _gpsIntervalSeconds = 6;
 
   // ========== ESTADO VEHÍCULO ==========
-  String _estadoVehiculo = 'disponible'; // disponible, lleno, fuera_de_servicio
+  String _estadoVehiculo = 'disponible';
   bool _estadoVehiculoCargando = false;
 
   // ========== PASAJEROS CERCANOS ==========
@@ -58,11 +59,9 @@ class _DashboardConductorState extends State<DashboardConductor>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Si la app va a background y está trabajando, seguir enviando GPS
     if (state == AppLifecycleState.paused && _trabajando) {
       AppLogger.i('App en background. GPS sigue activo.');
     }
-    // Si vuelve al foreground, actualizar ubicación inmediatamente
     if (state == AppLifecycleState.resumed && _trabajando) {
       AppLogger.i('App en foreground. Actualizando ubicación.');
       _enviarUbicacion();
@@ -73,7 +72,6 @@ class _DashboardConductorState extends State<DashboardConductor>
 
   Future<void> _cargarEstadoInicial() async {
     try {
-      // Cargar estado del vehículo desde el servidor
       final resp = await _api.get(ApiConfig.geoEstadoVehiculo);
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
@@ -91,9 +89,7 @@ class _DashboardConductorState extends State<DashboardConductor>
 
   void _iniciarEnvioGPS() {
     _gpsTimer?.cancel();
-    // Enviar inmediatamente la primera vez
     _enviarUbicacion();
-    // Luego cada 6 segundos
     _gpsTimer = Timer.periodic(
       const Duration(seconds: _gpsIntervalSeconds),
       (_) => _enviarUbicacion(),
@@ -110,10 +106,7 @@ class _DashboardConductorState extends State<DashboardConductor>
   Future<void> _enviarUbicacion() async {
     try {
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 5),
-        ),
+        desiredAccuracy: LocationAccuracy.high,
       );
 
       setState(() {
@@ -127,7 +120,6 @@ class _DashboardConductorState extends State<DashboardConductor>
               BitmapDescriptor.hueAzure,
             ),
           ),
-          // Mantener marcadores de pasajeros
           ..._markers.where((m) => m.markerId.value != 'me'),
         };
       });
@@ -172,7 +164,6 @@ class _DashboardConductorState extends State<DashboardConductor>
           _showSnackBar('✅ Estás trabajando. Los pasajeros pueden verte.');
         } else {
           _detenerEnvioGPS();
-          // Limpiar marcadores de pasajeros
           setState(() {
             _pasajerosCercanos = [];
             _markers = _markers.where((m) => m.markerId.value == 'me').toSet();
@@ -337,7 +328,6 @@ class _DashboardConductorState extends State<DashboardConductor>
 
     final Set<Marker> nuevosMarcadores = {};
 
-    // Mantener marcador del conductor
     nuevosMarcadores.add(
       Marker(
         markerId: const MarkerId('me'),
@@ -578,7 +568,6 @@ class _DashboardConductorState extends State<DashboardConductor>
       appBar: AppBar(
         title: const Text('Panel Conductor'),
         actions: [
-          // Indicador de estado vehículo en el AppBar
           if (_trabajando)
             IconButton(
               onPressed: _estadoVehiculoCargando
@@ -596,7 +585,6 @@ class _DashboardConductorState extends State<DashboardConductor>
                   : Icon(_iconEstadoVehiculo, color: _colorEstadoVehiculo),
               tooltip: 'Estado: $_labelEstadoVehiculo',
             ),
-          // Botón ver pasajeros cercanos
           if (_trabajando)
             IconButton(
               onPressed: _buscarPasajerosCercanos,
@@ -710,6 +698,19 @@ class _DashboardConductorState extends State<DashboardConductor>
                     );
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.devices),
+                  title: const Text('Sesiones activas'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SesionesActivasScreen(),
+                      ),
+                    );
+                  },
+                ),
                 const Divider(),
                 const LogoutButton(),
               ],
@@ -720,7 +721,6 @@ class _DashboardConductorState extends State<DashboardConductor>
       body: Stack(
         children: [
           mapWidget,
-          // Barra de estado inferior cuando está trabajando
           if (_trabajando)
             Positioned(
               top: 0,
@@ -780,7 +780,6 @@ class _DashboardConductorState extends State<DashboardConductor>
             ),
         ],
       ),
-      // ========== BOTÓN FLOTANTE: TRABAJAR ==========
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _toggleTrabajoCargando ? null : _toggleEstadoTrabajo,
         icon: _toggleTrabajoCargando
