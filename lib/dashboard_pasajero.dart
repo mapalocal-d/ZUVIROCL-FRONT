@@ -5,6 +5,8 @@ import 'pagar_suscripcion_pasajero.dart';
 import 'estado_suscripcion_pasajero.dart';
 import 'historial_pago_pasajero.dart';
 import 'ayuda_soporte.dart';
+import 'sesiones_activas.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -22,7 +24,8 @@ class DashboardPasajero extends StatefulWidget {
   State<DashboardPasajero> createState() => _DashboardPasajeroState();
 }
 
-class _DashboardPasajeroState extends State<DashboardPasajero> {
+class _DashboardPasajeroState extends State<DashboardPasajero>
+    with WidgetsBindingObserver {
   final _api = ApiClient();
   final _secure = SecureStorage();
   late Future<Map<String, String>> _datosUsuarioFuture;
@@ -33,6 +36,15 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   String? _locationError;
   String? _networkError;
   bool _buscandoConductores = false;
+
+  // ========== ESTADO DE BÚSQUEDA ACTIVA (#6, #7, #8) ==========
+  bool _buscandoLinea = false;
+  String? _lineaBuscada;
+  String? _ciudadBuscada;
+  String? _regionBuscada;
+  bool _toggleBusquedaCargando = false;
+  Timer? _refreshConductoresTimer;
+  static const int _refreshIntervalSeconds = 30;
 
   List<dynamic> _regiones = [];
   List<dynamic> _ciudades = [];
@@ -58,15 +70,183 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _datosUsuarioFuture = _getNombreEmail();
     _loadCurrentLocation();
     _cargarConfiguracion();
+    _cargarMiEstado();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _buscandoLinea) {
+      AppLogger.i('App en foreground. Refrescando conductores.');
+      _refrescarConductores();
+    }
   }
 
   // ========== UTILIDADES ==========
 
   String _normalizarCiudad(String ciudad) {
     return removeDiacritics(ciudad).toLowerCase().trim();
+  }
+
+  // ========== CARGAR ESTADO INICIAL (#8) ==========
+
+  Future<void> _cargarMiEstado() async {
+    try {
+      final resp = await _api.get(ApiConfig.geoMiEstado);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final buscando = data['buscando'] == true;
+        final linea = data['linea']?.toString();
+        final ciudad = data['ciudad']?.toString();
+        final region = data['region']?.toString();
+
+        if (buscando && linea != null && linea.isNotEmpty) {
+          setState(() {
+            _buscandoLinea = true;
+            _lineaBuscada = linea;
+            _ciudadBuscada = ciudad;
+            _regionBuscada = region;
+          });
+          _iniciarRefreshConductores();
+          AppLogger.i('Estado restaurado: buscando línea $linea');
+        }
+      }
+    } catch (e) {
+      AppLogger.w('No se pudo cargar mi-estado: $e');
+    }
+  }
+
+  // ========== ACTIVAR BÚSQUEDA (#6) ==========
+
+  Future<void> _activarBusqueda({
+    required String linea,
+    String? region,
+    String? ciudad,
+  }) async {
+    if (_userPosition == null) {
+      _mostrarMensaje('Primero debes activar tu ubicación GPS');
+      return;
+    }
+
+    setState(() => _toggleBusquedaCargando = true);
+
+    try {
+      final resp = await _api.patch(
+        ApiConfig.geoBuscarLinea,
+        body: {
+          "linea": linea,
+          "lat": _userPosition!.latitude,
+          "lng": _userPosition!.longitude,
+          if (region != null) "region": region,
+          if (ciudad != null) "ciudad": ciudad,
+        },
+      );
+
+      if (resp.statusCode == 200) {
+        setState(() {
+          _buscandoLinea = true;
+          _lineaBuscada = linea;
+          _ciudadBuscada = ciudad;
+          _regionBuscada = region;
+        });
+        _iniciarRefreshConductores();
+        _mostrarMensaje('🔍 Buscando conductores de línea $linea...');
+        AppLogger.i('Búsqueda activada: línea $linea');
+
+        await _buscarConductores(linea: linea, region: region, ciudad: ciudad);
+      } else {
+        final body = jsonDecode(resp.body);
+        final detail = body['detail'] ?? 'Error al activar búsqueda.';
+        _mostrarMensaje('❌ $detail');
+        AppLogger.w('Error activando búsqueda: ${resp.statusCode} - $detail');
+      }
+    } on SinConexionException {
+      _mostrarMensaje('❌ Sin conexión a internet.');
+    } catch (e) {
+      AppLogger.e('Error en activar búsqueda', e);
+      _mostrarMensaje('❌ Error al activar búsqueda.');
+    } finally {
+      setState(() => _toggleBusquedaCargando = false);
+    }
+  }
+
+  // ========== DESACTIVAR BÚSQUEDA (#7) ==========
+
+  Future<void> _desactivarBusqueda() async {
+    setState(() => _toggleBusquedaCargando = true);
+
+    try {
+      final resp = await _api.patch(ApiConfig.geoDejarBuscar);
+
+      if (resp.statusCode == 200) {
+        _detenerRefreshConductores();
+        setState(() {
+          _buscandoLinea = false;
+          _lineaBuscada = null;
+          _ciudadBuscada = null;
+          _regionBuscada = null;
+          _markers = _markers.where((m) => m.markerId.value == 'yo').toSet();
+        });
+        _mostrarMensaje('⏹️ Dejaste de buscar. Los conductores ya no te ven.');
+        AppLogger.i('Búsqueda desactivada.');
+      } else {
+        _mostrarMensaje('❌ No se pudo desactivar la búsqueda.');
+      }
+    } on SinConexionException {
+      _mostrarMensaje('❌ Sin conexión a internet.');
+    } catch (e) {
+      AppLogger.e('Error desactivando búsqueda', e);
+      _mostrarMensaje('❌ Error al desactivar búsqueda.');
+    } finally {
+      setState(() => _toggleBusquedaCargando = false);
+    }
+  }
+
+  // ========== REFRESH AUTOMÁTICO DE CONDUCTORES ==========
+
+  void _iniciarRefreshConductores() {
+    _refreshConductoresTimer?.cancel();
+    _refreshConductoresTimer = Timer.periodic(
+      const Duration(seconds: _refreshIntervalSeconds),
+      (_) => _refrescarConductores(),
+    );
+    AppLogger.i(
+      'Auto-refresh conductores activado: cada ${_refreshIntervalSeconds}s',
+    );
+  }
+
+  void _detenerRefreshConductores() {
+    _refreshConductoresTimer?.cancel();
+    _refreshConductoresTimer = null;
+    AppLogger.i('Auto-refresh conductores desactivado.');
+  }
+
+  Future<void> _refrescarConductores() async {
+    if (_lineaBuscada == null || _userPosition == null) return;
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
+      setState(() {
+        _userPosition = position;
+      });
+
+      await _buscarConductores(
+        linea: _lineaBuscada!,
+        region: _regionBuscada,
+        ciudad: _ciudadBuscada,
+        silencioso: true,
+      );
+    } catch (e) {
+      AppLogger.w('Error refrescando conductores: $e');
+    }
   }
 
   // ========== CONFIGURACIÓN ==========
@@ -220,7 +400,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                         ),
                       ),
                       const SizedBox(height: 20),
-
                       const Text(
                         'Buscar Colectivo',
                         style: TextStyle(
@@ -236,8 +415,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 24),
-
-                      // Selector de Región
                       DropdownButtonFormField<String>(
                         isExpanded: true,
                         decoration: InputDecoration(
@@ -257,7 +434,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                           final color =
                               _coloresRegion[region['codigo']] ??
                               const Color(0xFF424242);
-
                           return DropdownMenuItem<String>(
                             value: region['codigo'],
                             child: Row(
@@ -297,8 +473,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                         },
                       ),
                       const SizedBox(height: 16),
-
-                      // Selector de Ciudad
                       DropdownButtonFormField<String>(
                         isExpanded: true,
                         decoration: InputDecoration(
@@ -335,7 +509,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                                   cargandoLineas = true;
                                   lineasDisponibles = [];
                                 });
-
                                 if (value != null) {
                                   final lineas = await _cargarLineas(value);
                                   setModalState(() {
@@ -346,8 +519,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                               },
                       ),
                       const SizedBox(height: 16),
-
-                      // Indicador de carga
                       if (cargandoLineas)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 8),
@@ -359,8 +530,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                             ),
                           ),
                         ),
-
-                      // Selector de Línea
                       if (!cargandoLineas && lineasDisponibles.isNotEmpty)
                         DropdownButtonFormField<String>(
                           isExpanded: true,
@@ -394,8 +563,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                             setModalState(() => lineaSeleccionada = value);
                           },
                         ),
-
-                      // Sin líneas disponibles
                       if (!cargandoLineas &&
                           ciudadSeleccionada != null &&
                           lineasDisponibles.isEmpty)
@@ -428,26 +595,24 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                             ),
                           ),
                         ),
-
                       const SizedBox(height: 24),
-
-                      // Botón Buscar
                       SizedBox(
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton.icon(
                           onPressed:
-                              lineaSeleccionada == null || _buscandoConductores
+                              lineaSeleccionada == null ||
+                                  _toggleBusquedaCargando
                               ? null
                               : () {
                                   Navigator.pop(context);
-                                  _buscarConductores(
+                                  _activarBusqueda(
                                     linea: lineaSeleccionada!,
                                     region: regionSeleccionada,
                                     ciudad: ciudadSeleccionada,
                                   );
                                 },
-                          icon: _buscandoConductores
+                          icon: _toggleBusquedaCargando
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
@@ -458,8 +623,8 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                                 )
                               : const Icon(Icons.search, color: Colors.white),
                           label: Text(
-                            _buscandoConductores
-                                ? 'Buscando...'
+                            _toggleBusquedaCargando
+                                ? 'Activando...'
                                 : 'Buscar conductores',
                             style: const TextStyle(
                               fontSize: 16,
@@ -478,8 +643,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                         ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Botón Cancelar
                       SizedBox(
                         width: double.infinity,
                         height: 45,
@@ -506,13 +669,16 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     required String linea,
     String? region,
     String? ciudad,
+    bool silencioso = false,
   }) async {
     if (_userPosition == null) {
-      _mostrarMensaje('Primero debes activar tu ubicación GPS');
+      if (!silencioso) {
+        _mostrarMensaje('Primero debes activar tu ubicación GPS');
+      }
       return;
     }
 
-    setState(() => _buscandoConductores = true);
+    if (!silencioso) setState(() => _buscandoConductores = true);
 
     try {
       final ciudadNormalizada = ciudad != null
@@ -540,24 +706,32 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
         final data = jsonDecode(response.body);
         final conductores = data['conductores'] as List<dynamic>;
 
-        setState(() => _buscandoConductores = false);
+        if (!silencioso) setState(() => _buscandoConductores = false);
         _mostrarConductoresEnMapa(conductores);
 
-        if (conductores.isEmpty) {
-          _mostrarAlertaSinConductores(linea);
-        } else {
-          _mostrarMensaje('${conductores.length} conductor(es) encontrados');
+        if (!silencioso) {
+          if (conductores.isEmpty) {
+            _mostrarAlertaSinConductores(linea);
+          } else {
+            _mostrarMensaje('${conductores.length} conductor(es) encontrados');
+          }
         }
       } else if (response.statusCode == 403) {
-        throw Exception(
-          'Necesitas una suscripción activa para buscar conductores.',
-        );
+        if (!silencioso) {
+          _mostrarMensaje(
+            'Necesitas una suscripción activa para buscar conductores.',
+          );
+        }
       } else {
-        throw Exception('Error del servidor: ${response.statusCode}');
+        if (!silencioso) {
+          _mostrarMensaje('Error del servidor: ${response.statusCode}');
+        }
       }
     } catch (e) {
-      setState(() => _buscandoConductores = false);
-      _mostrarMensaje('Error: ${e.toString()}');
+      if (!silencioso) {
+        setState(() => _buscandoConductores = false);
+        _mostrarMensaje('Error: ${e.toString()}');
+      }
     }
   }
 
@@ -577,11 +751,11 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
     for (var i = 0; i < conductores.length; i++) {
       final c = conductores[i];
-      final lat = c['lat'] as double;
-      final lng = c['lng'] as double;
+      final lat = (c['lat'] as num).toDouble();
+      final lng = (c['lng'] as num).toDouble();
       final linea = c['linea'] as String;
-      final distancia = c['distancia_km'] as double;
-      final tiempo = c['tiempo_llegada_estimado_min'] as double;
+      final distancia = (c['distancia_km'] as num).toDouble();
+      final tiempo = (c['tiempo_llegada_estimado_min'] as num).toDouble();
 
       nuevosMarcadores.add(
         Marker(
@@ -636,7 +810,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
         title: const Text('No hay conductores'),
         content: Text(
           'No encontramos conductores de la línea $linea cerca de ti en este momento.\n\n'
-          'Intenta con otra línea o verifica más tarde.',
+          'Tu búsqueda sigue activa y se actualizará automáticamente.',
         ),
         actions: [
           TextButton(
@@ -646,6 +820,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
+              _desactivarBusqueda();
               _mostrarBuscadorConductores();
             },
             child: const Text('Buscar otra línea'),
@@ -732,12 +907,12 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                 _filaInformacion(
                   Icons.local_gas_station,
                   'Estado vehículo',
-                  conductor['estado_vehiculo'],
+                  conductor['estado_vehiculo'] ?? 'desconocido',
                 ),
                 _filaInformacion(
                   Icons.update,
                   'Última actualización',
-                  conductor['actualizado_recientemente']
+                  conductor['actualizado_recientemente'] == true
                       ? 'Hace instantes'
                       : 'Hace ${conductor['segundos_desde_actualizacion']} segundos',
                 ),
@@ -802,12 +977,10 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   // ========== DATOS DE USUARIO ==========
 
   Future<Map<String, String>> _getNombreEmail() async {
-    // 1. Cargar datos locales inmediatamente (caché)
     String nombre = await _secure.getNombre() ?? '';
     String apellido = await _secure.getApellido() ?? '';
     String email = await _secure.getCorreo() ?? '';
 
-    // 2. Siempre actualizar desde el servidor en background
     try {
       final resp = await _api.get(ApiConfig.usuarioMe);
       if (resp.statusCode == 200) {
@@ -854,6 +1027,8 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _detenerRefreshConductores();
     _mapController?.dispose();
     super.dispose();
   }
@@ -913,7 +1088,20 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Panel Pasajero')),
+      appBar: AppBar(
+        title: const Text('Panel Pasajero'),
+        actions: [
+          if (_buscandoLinea)
+            IconButton(
+              onPressed: () async {
+                await _refrescarConductores();
+                _mostrarMensaje('🔄 Conductores actualizados');
+              },
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refrescar conductores',
+            ),
+        ],
+      ),
       drawer: Drawer(
         child: FutureBuilder<Map<String, String>>(
           future: _datosUsuarioFuture,
@@ -1018,6 +1206,19 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                     );
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.devices),
+                  title: const Text('Sesiones activas'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SesionesActivasScreen(),
+                      ),
+                    );
+                  },
+                ),
                 const Divider(),
                 const LogoutButton(),
               ],
@@ -1025,33 +1226,116 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
           },
         ),
       ),
-      body: mapaWidget,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _buscandoConductores ? null : _mostrarBuscadorConductores,
-        icon: _buscandoConductores
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: Colors.white,
+      body: Stack(
+        children: [
+          mapaWidget,
+          if (_buscandoLinea)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
                 ),
-              )
-            : const Icon(Icons.search, color: Colors.white, size: 28),
-        label: Text(
-          _buscandoConductores ? 'Buscando...' : 'Buscar colectivo',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-        backgroundColor: _buscandoConductores
-            ? Colors.blue[600]
-            : Colors.blue[800],
-        disabledElevation: 0,
-        elevation: 4,
+                decoration: BoxDecoration(
+                  color: Colors.blue[800]!.withOpacity(0.9),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '🔍 Buscando línea $_lineaBuscada'
+                          '${_ciudadBuscada != null ? ' en $_ciudadBuscada' : ''}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: _toggleBusquedaCargando
+                            ? null
+                            : _desactivarBusqueda,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red[600],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Detener',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
+      floatingActionButton: _buscandoLinea
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _buscandoConductores || _toggleBusquedaCargando
+                  ? null
+                  : _mostrarBuscadorConductores,
+              icon: _buscandoConductores || _toggleBusquedaCargando
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.search, color: Colors.white, size: 28),
+              label: Text(
+                _buscandoConductores || _toggleBusquedaCargando
+                    ? 'Buscando...'
+                    : 'Buscar colectivo',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              backgroundColor: _buscandoConductores || _toggleBusquedaCargando
+                  ? Colors.blue[600]
+                  : Colors.blue[800],
+              disabledElevation: 0,
+              elevation: 4,
+            ),
     );
   }
 }
