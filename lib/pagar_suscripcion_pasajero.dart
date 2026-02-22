@@ -3,9 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
-
-// Importa tu Dashboard
 import 'dashboard_pasajero.dart';
+import 'api_config.dart';
 
 class PagoSuscripcionScreen extends StatefulWidget {
   const PagoSuscripcionScreen({Key? key}) : super(key: key);
@@ -49,9 +48,7 @@ class _PagoSuscripcionScreenState extends State<PagoSuscripcionScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      final url = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/subscriptions/passenger/create',
-      );
+      final url = Uri.parse(ApiConfig.suscripcionCrear);
       int meses = _meses;
       final resp = await http.post(
         url,
@@ -115,9 +112,9 @@ class _PagoSuscripcionScreenState extends State<PagoSuscripcionScreen> {
             );
           },
         ),
-        actions: [
+        actions: const [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: EdgeInsets.only(right: 16),
             child: Text(
               "ZUVIROapps",
               style: TextStyle(
@@ -151,12 +148,12 @@ class _PagoSuscripcionScreenState extends State<PagoSuscripcionScreen> {
                     controller: _mesesController,
                     keyboardType: TextInputType.number,
                     style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: "Meses (1 a 12)",
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      labelStyle: TextStyle(color: Colors.white70),
                       filled: true,
                       fillColor: Colors.black54,
-                      border: const OutlineInputBorder(),
+                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       final n = int.tryParse(value ?? '');
@@ -168,7 +165,7 @@ class _PagoSuscripcionScreenState extends State<PagoSuscripcionScreen> {
                   const SizedBox(height: 18),
                   Text(
                     'Total a pagar: $_meses x \$${precioMensual.toString()} = \$${total.toString()} CLP',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Color(0xFF1476FF),
                       fontWeight: FontWeight.bold,
                       fontSize: 18,

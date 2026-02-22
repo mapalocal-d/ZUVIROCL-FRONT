@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'politica_legal.dart'; // Importa la pantalla de Políticas
+import 'politica_legal.dart';
+import 'api_config.dart';
 
 const emeraldGreen = Color(0xFF50C878);
 final List<String> dominiosProhibidos = [
@@ -45,12 +46,9 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
-  // ========= VALIDACIÓN EMAIL EXISTE EN BACKEND =========
   Future<bool> emailExisteEnBackend(String email) async {
     final response = await http.get(
-      Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/auth/check-email-pasajero?email=$email',
-      ),
+      Uri.parse('${ApiConfig.checkEmail}?email=$email&rol=pasajero'),
       headers: {'accept': 'application/json'},
     );
     if (response.statusCode == 200) {
@@ -89,7 +87,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
     setState(() => _checkingEmail = false);
   }
 
-  // ============= VALIDACIONES =============
   String? _validateNombre(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
     final nombre = value.trim();
@@ -160,7 +157,6 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
     return null;
   }
 
-  // ========== REGISTRO Y NAVEGACIÓN ==========
   Future<void> _registerPassenger() async {
     if (!_formKey.currentState!.validate() || !_aceptaTerminos) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -176,15 +172,13 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
       _loading = true;
     });
 
-    final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/register/passenger',
-    );
+    final url = Uri.parse(ApiConfig.registerPasajero);
     final body = {
       "nombre": _nombreController.text.trim(),
       "apellido": _apellidoController.text.trim(),
-      "email": _emailController.text.trim(),
-      "password": _passwordController.text,
-      "confirm_password": _confirmPasswordController.text,
+      "correo": _emailController.text.trim(),
+      "contrasena": _passwordController.text,
+      "confirmar_contrasena": _confirmPasswordController.text,
       "acepta_terminos": _aceptaTerminos,
     };
 
@@ -198,9 +192,23 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
       if (resp.statusCode == 201) {
         final respBody = json.decode(resp.body);
         final accessToken = respBody['access_token'];
+        final refreshToken = respBody['refresh_token'];
         if (accessToken != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('access_token', accessToken);
+          if (refreshToken != null) {
+            await prefs.setString('refresh_token', refreshToken);
+          }
+          await prefs.setString('rol', 'pasajero');
+
+          final usuario = respBody['usuario'];
+          if (usuario != null) {
+            await prefs.setString('nombre', usuario['nombre'] ?? '');
+            await prefs.setString('correo', usuario['correo'] ?? '');
+            if (usuario['uuid'] != null) {
+              await prefs.setString('uuid', usuario['uuid']);
+            }
+          }
         }
         messenger.showSnackBar(
           const SnackBar(
@@ -259,16 +267,16 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
             children: [
               TextFormField(
                 controller: _nombreController,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Nombre',
-                  labelStyle: const TextStyle(color: Colors.blue, fontSize: 15),
-                  enabledBorder: const OutlineInputBorder(
+                  labelStyle: TextStyle(color: Colors.blue, fontSize: 15),
+                  enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 1),
                   ),
-                  focusedBorder: const OutlineInputBorder(
+                  focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 2),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
+                  contentPadding: EdgeInsets.symmetric(
                     vertical: 11,
                     horizontal: 11,
                   ),
@@ -280,16 +288,16 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
               const SizedBox(height: 7),
               TextFormField(
                 controller: _apellidoController,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Apellido',
-                  labelStyle: const TextStyle(color: Colors.blue, fontSize: 15),
-                  enabledBorder: const OutlineInputBorder(
+                  labelStyle: TextStyle(color: Colors.blue, fontSize: 15),
+                  enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 1),
                   ),
-                  focusedBorder: const OutlineInputBorder(
+                  focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 2),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
+                  contentPadding: EdgeInsets.symmetric(
                     vertical: 11,
                     horizontal: 11,
                   ),
@@ -315,7 +323,10 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                     horizontal: 11,
                   ),
                   helperText: "Debe ser válido (ejemplo@correo.com)",
-                  helperStyle: TextStyle(color: emeraldGreen, fontSize: 13.5),
+                  helperStyle: const TextStyle(
+                    color: emeraldGreen,
+                    fontSize: 13.5,
+                  ),
                   errorText: _emailErrorText,
                 ),
                 style: const TextStyle(color: Colors.blue, fontSize: 15),
@@ -347,7 +358,10 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                   ),
                   helperText:
                       "Debe tener entre 8 y 32 caracteres, al menos un número y una mayúscula.",
-                  helperStyle: TextStyle(color: emeraldGreen, fontSize: 13.5),
+                  helperStyle: const TextStyle(
+                    color: emeraldGreen,
+                    fontSize: 13.5,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _showPassword ? Icons.visibility_off : Icons.visibility,
@@ -382,7 +396,10 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                     horizontal: 11,
                   ),
                   helperText: "Debe coincidir con tu contraseña.",
-                  helperStyle: TextStyle(color: emeraldGreen, fontSize: 13.5),
+                  helperStyle: const TextStyle(
+                    color: emeraldGreen,
+                    fontSize: 13.5,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _showConfirmPassword

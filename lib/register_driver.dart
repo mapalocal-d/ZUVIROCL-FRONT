@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'politica_legal.dart'; // Importa la pantalla de políticas legales
+import 'politica_legal.dart';
+import 'api_config.dart';
 
 const emeraldGreen = Color(0xFF50C878);
 
@@ -67,12 +68,9 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
         .replaceAll('ñ', 'n');
   }
 
-  // ========= VALIDACIÓN EMAIL EXISTE EN BACKEND =========
   Future<bool> emailExisteEnBackend(String email) async {
     final response = await http.get(
-      Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/auth/check-email-conductor?email=$email',
-      ),
+      Uri.parse('${ApiConfig.checkEmail}?email=$email&rol=conductor'),
       headers: {'accept': 'application/json'},
     );
     if (response.statusCode == 200) {
@@ -110,8 +108,6 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     }
     setState(() => _checkingEmail = false);
   }
-
-  // ========= VALIDACIONES EXTRAS DEL SCHEMA PYDANTIC =========
 
   String? _validateNombre(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
@@ -222,11 +218,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
 
   Future<void> _loadCiudadesYRegiones() async {
     try {
-      final resp = await http.get(
-        Uri.parse(
-          'https://graceful-balance-production-ef1d.up.railway.app/config/cities',
-        ),
-      );
+      final resp = await http.get(Uri.parse(ApiConfig.configCiudades));
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
         setState(() {
@@ -263,7 +255,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     try {
       final resp = await http.get(
         Uri.parse(
-          'https://graceful-balance-production-ef1d.up.railway.app/config/lines?ciudad=${Uri.encodeComponent(ciudadNormalizada)}',
+          '${ApiConfig.configLineas}?ciudad=${Uri.encodeComponent(ciudadNormalizada)}',
         ),
       );
       if (resp.statusCode == 200) {
@@ -301,15 +293,13 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       _error = null;
     });
 
-    final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/register/conductor',
-    );
+    final url = Uri.parse(ApiConfig.registerConductor);
     final body = {
       "nombre": _nombreController.text.trim(),
       "apellido": _apellidoController.text.trim(),
-      "email": _emailController.text.trim(),
-      "password": _passwordController.text,
-      "confirm_password": _confirmPasswordController.text,
+      "correo": _emailController.text.trim(),
+      "contrasena": _passwordController.text,
+      "confirmar_contrasena": _confirmPasswordController.text,
       "region": _selectedRegion,
       "ciudad": _selectedCiudad,
       "patente": _patenteController.text.trim().toUpperCase().replaceAll(
@@ -330,9 +320,23 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       if (resp.statusCode == 201) {
         final respBody = json.decode(resp.body);
         final accessToken = respBody['access_token'];
+        final refreshToken = respBody['refresh_token'];
         if (accessToken != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('access_token', accessToken);
+          if (refreshToken != null) {
+            await prefs.setString('refresh_token', refreshToken);
+          }
+          await prefs.setString('rol', 'conductor');
+
+          final usuario = respBody['usuario'];
+          if (usuario != null) {
+            await prefs.setString('nombre', usuario['nombre'] ?? '');
+            await prefs.setString('correo', usuario['correo'] ?? '');
+            if (usuario['uuid'] != null) {
+              await prefs.setString('uuid', usuario['uuid']);
+            }
+          }
         }
         messenger.showSnackBar(
           const SnackBar(
@@ -457,16 +461,13 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                   children: [
                     DropdownButtonFormField<String>(
                       value: _selectedRegion,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: "Región",
-                        labelStyle: const TextStyle(
-                          color: Colors.blue,
-                          fontSize: 15,
-                        ),
-                        enabledBorder: const OutlineInputBorder(
+                        labelStyle: TextStyle(color: Colors.blue, fontSize: 15),
+                        enabledBorder: OutlineInputBorder(
                           borderSide: BorderSide(color: Colors.blue, width: 1),
                         ),
-                        focusedBorder: const OutlineInputBorder(
+                        focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(color: Colors.blue, width: 2),
                         ),
                       ),
@@ -512,19 +513,19 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                         children: [
                           DropdownButtonFormField<String>(
                             value: _selectedCiudad,
-                            decoration: InputDecoration(
+                            decoration: const InputDecoration(
                               labelText: "Ciudad",
-                              labelStyle: const TextStyle(
+                              labelStyle: TextStyle(
                                 color: Colors.blue,
                                 fontSize: 15,
                               ),
-                              enabledBorder: const OutlineInputBorder(
+                              enabledBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.blue,
                                   width: 1,
                                 ),
                               ),
-                              focusedBorder: const OutlineInputBorder(
+                              focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.blue,
                                   width: 2,
@@ -585,19 +586,19 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                         children: [
                           DropdownButtonFormField<String>(
                             value: _selectedLinea,
-                            decoration: InputDecoration(
+                            decoration: const InputDecoration(
                               labelText: "Línea o recorrido",
-                              labelStyle: const TextStyle(
+                              labelStyle: TextStyle(
                                 color: Colors.blue,
                                 fontSize: 15,
                               ),
-                              enabledBorder: const OutlineInputBorder(
+                              enabledBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.blue,
                                   width: 1,
                                 ),
                               ),
-                              focusedBorder: const OutlineInputBorder(
+                              focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.blue,
                                   width: 2,

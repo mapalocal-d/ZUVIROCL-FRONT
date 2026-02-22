@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'api_config.dart';
 
 class PerfilPasajeroScreen extends StatefulWidget {
   const PerfilPasajeroScreen({super.key});
@@ -26,9 +27,7 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token == null) return;
-    final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/users/me',
-    );
+    final url = Uri.parse(ApiConfig.usuarioMe);
     try {
       final resp = await http.get(
         url,
@@ -114,9 +113,7 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
       if (token == null) return;
-      final url = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/users/me/profile/passenger',
-      );
+      final url = Uri.parse(ApiConfig.perfilPasajero);
       try {
         final resp = await http.patch(
           url,
@@ -159,7 +156,6 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: emeraldGreen));
   }
 
-  // Valida contraseña: 8+ caracteres, al menos una mayúscula y un número
   bool _validarPassword(String password) {
     final hasMinLength = password.length >= 8;
     final hasUppercase = password.contains(RegExp(r'[A-Z]'));
@@ -278,9 +274,7 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
       final token = prefs.getString('access_token');
       if (token == null) return;
 
-      final url = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/passenger/change-password',
-      );
+      final url = Uri.parse(ApiConfig.cambiarContrasena);
       try {
         final resp = await http.put(
           url,
@@ -289,9 +283,9 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
             "Content-Type": "application/json",
           },
           body: jsonEncode({
-            "password_actual": actualController.text,
-            "password_nueva": nueva,
-            "confirmar_password": confirmar,
+            "contrasena_actual": actualController.text,
+            "contrasena_nueva": nueva,
+            "confirmar_contrasena": confirmar,
           }),
         );
         if (resp.statusCode == 200) {
@@ -311,9 +305,7 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token == null) return;
-    final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/users/me/delete-account',
-    );
+    final url = Uri.parse(ApiConfig.eliminarCuenta);
     try {
       final resp = await http.delete(
         url,
@@ -358,7 +350,7 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
+            const Center(
               child: CircleAvatar(
                 radius: 46,
                 child: Icon(Icons.person, size: 50),
@@ -367,31 +359,29 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
             const SizedBox(height: 18),
             Text(
               "Nombre: ${_userData!['nombre'] ?? ''}",
-              style: TextStyle(fontSize: 20, color: Colors.white),
+              style: const TextStyle(fontSize: 20, color: Colors.white),
             ),
             Text(
               "Apellido: ${_userData!['apellido'] ?? ''}",
-              style: TextStyle(fontSize: 20, color: Colors.white),
+              style: const TextStyle(fontSize: 20, color: Colors.white),
             ),
             Text(
-              "Email: ${_userData!['email'] ?? ''}",
-              style: TextStyle(color: Colors.grey),
+              "Email: ${_userData!['correo'] ?? ''}",
+              style: const TextStyle(color: Colors.grey),
             ),
             Text(
               "Ciudad: ${_userData!['ciudad'] ?? ''}",
-              style: TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white),
             ),
             Text(
               "Rol: ${_userData!['rol'] ?? ''}",
-              style: TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white),
             ),
             const SizedBox(height: 25),
             ElevatedButton(
               onPressed: _editarPerfil,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(
-                  context,
-                ).primaryColor, // Azul por tema general
+                backgroundColor: Theme.of(context).primaryColor,
                 minimumSize: const Size.fromHeight(40),
               ),
               child: const Text('Editar datos'),
@@ -400,9 +390,7 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
             ElevatedButton(
               onPressed: _cambiarContrasena,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(
-                  context,
-                ).primaryColor, // Azul por tema general
+                backgroundColor: Theme.of(context).primaryColor,
                 minimumSize: const Size.fromHeight(40),
               ),
               child: const Text('Cambiar contraseña'),

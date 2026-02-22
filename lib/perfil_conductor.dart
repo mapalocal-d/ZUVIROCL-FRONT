@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'api_config.dart';
 
 class PerfilConductorScreen extends StatefulWidget {
   const PerfilConductorScreen({super.key});
@@ -26,9 +27,7 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token == null) return;
-    final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/users/me',
-    );
+    final url = Uri.parse(ApiConfig.usuarioMe);
     try {
       final resp = await http.get(
         url,
@@ -160,9 +159,7 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
       if (token == null) return;
-      final url = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/users/me/profile/conductor',
-      );
+      final url = Uri.parse(ApiConfig.perfilConductor);
       try {
         final resp = await http.patch(
           url,
@@ -327,9 +324,7 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
       final token = prefs.getString('access_token');
       if (token == null) return;
 
-      final url = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/conductor/change-password',
-      );
+      final url = Uri.parse(ApiConfig.cambiarContrasena);
       try {
         final resp = await http.put(
           url,
@@ -338,9 +333,9 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
             "Content-Type": "application/json",
           },
           body: jsonEncode({
-            "password_actual": actualController.text,
-            "password_nueva": nueva,
-            "confirmar_password": confirmar,
+            "contrasena_actual": actualController.text,
+            "contrasena_nueva": nueva,
+            "confirmar_contrasena": confirmar,
           }),
         );
         if (resp.statusCode == 200) {
@@ -360,9 +355,7 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token == null) return;
-    final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/users/me/delete-account',
-    );
+    final url = Uri.parse(ApiConfig.eliminarCuenta);
     try {
       final resp = await http.delete(
         url,
@@ -408,7 +401,7 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
+              const Center(
                 child: CircleAvatar(
                   radius: 46,
                   child: Icon(Icons.person, size: 50),
@@ -417,35 +410,35 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
               const SizedBox(height: 18),
               Text(
                 "Nombre: ${_userData!['nombre'] ?? ''}",
-                style: TextStyle(fontSize: 20, color: Colors.white),
+                style: const TextStyle(fontSize: 20, color: Colors.white),
               ),
               Text(
                 "Apellido: ${_userData!['apellido'] ?? ''}",
-                style: TextStyle(fontSize: 20, color: Colors.white),
+                style: const TextStyle(fontSize: 20, color: Colors.white),
               ),
               Text(
-                "Email: ${_userData!['email'] ?? ''}",
-                style: TextStyle(color: Colors.grey),
+                "Email: ${_userData!['correo'] ?? ''}",
+                style: const TextStyle(color: Colors.grey),
               ),
               Text(
                 "Región: ${_userData!['region'] ?? ''}",
-                style: TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white),
               ),
               Text(
                 "Ciudad: ${_userData!['ciudad'] ?? ''}",
-                style: TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white),
               ),
               Text(
                 "Patente: ${_userData!['patente'] ?? ''}",
-                style: TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white),
               ),
               Text(
                 "Línea de Recorrido: ${_userData!['linea_recorrido'] ?? ''}",
-                style: TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white),
               ),
               Text(
                 "Rol: ${_userData!['rol'] ?? ''}",
-                style: TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white),
               ),
               const SizedBox(height: 25),
               ElevatedButton(

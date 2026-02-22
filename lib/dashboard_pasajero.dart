@@ -11,7 +11,8 @@ import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:diacritic/diacritic.dart'; // Necesitarás agregar esta dependencia
+import 'package:diacritic/diacritic.dart';
+import 'api_config.dart';
 
 class DashboardPasajero extends StatefulWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
@@ -21,7 +22,6 @@ class DashboardPasajero extends StatefulWidget {
 }
 
 class _DashboardPasajeroState extends State<DashboardPasajero> {
-  // Estado principal
   late Future<Map<String, String>> _datosUsuarioFuture;
   Position? _userPosition;
   GoogleMapController? _mapController;
@@ -31,32 +31,27 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   String? _networkError;
   bool _buscandoConductores = false;
 
-  // Datos para selectores
   List<dynamic> _regiones = [];
   List<dynamic> _ciudades = [];
 
-  // Colores personalizados para regiones (más oscuros y legibles)
   final Map<String, Color> _coloresRegion = {
-    'II': const Color(0xFF1565C0), // Azul oscuro
-    'III': const Color(0xFF2E7D32), // Verde oscuro
-    'IV': const Color(0xFF6A1B9A), // Púrpura oscuro
-    'V': const Color(0xFFC62828), // Rojo oscuro
-    'VI': const Color(0xFFEF6C00), // Naranja oscuro
-    'VII': const Color(0xFF00695C), // Verde azulado oscuro
-    'VIII': const Color(0xFFAD1457), // Rosa oscuro
-    'IX': const Color(0xFF4527A0), // Índigo oscuro
-    'X': const Color(0xFF263238), // Gris azulado oscuro
-    'XI': const Color(0xFF3E2723), // Marrón oscuro
-    'XII': const Color(0xFF0D47A1), // Azul marino
-    'RM': const Color(0xFFB71C1C), // Rojo oscuro
-    'XIV': const Color(0xFF1B5E20), // Verde bosque
-    'XV': const Color(0xFF4A148C), // Púrpura intenso
-    'XVI': const Color(0xFF827717), // Verde oliva
+    'II': const Color(0xFF1565C0),
+    'III': const Color(0xFF2E7D32),
+    'IV': const Color(0xFF6A1B9A),
+    'V': const Color(0xFFC62828),
+    'VI': const Color(0xFFEF6C00),
+    'VII': const Color(0xFF00695C),
+    'VIII': const Color(0xFFAD1457),
+    'IX': const Color(0xFF4527A0),
+    'X': const Color(0xFF263238),
+    'XI': const Color(0xFF3E2723),
+    'XII': const Color(0xFF0D47A1),
+    'RM': const Color(0xFFB71C1C),
+    'XIV': const Color(0xFF1B5E20),
+    'XV': const Color(0xFF4A148C),
+    'XVI': const Color(0xFF827717),
   };
 
-  // Constantes
-  static const String _baseUrl =
-      'https://graceful-balance-production-ef1d.up.railway.app';
   static const Duration _timeout = Duration(seconds: 15);
 
   @override
@@ -69,7 +64,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
   // ========== UTILIDADES ==========
 
-  /// Normaliza el nombre de ciudad para el backend (minúsculas, sin acentos)
   String _normalizarCiudad(String ciudad) {
     return removeDiacritics(ciudad).toLowerCase().trim();
   }
@@ -80,7 +74,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     try {
       final response = await http
           .get(
-            Uri.parse('$_baseUrl/config/cities'),
+            Uri.parse(ApiConfig.configCiudades),
             headers: {'Accept': 'application/json'},
           )
           .timeout(_timeout);
@@ -99,11 +93,10 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
   Future<List<dynamic>> _cargarLineas(String ciudad) async {
     try {
-      // CORRECCIÓN: Normalizar el nombre de ciudad antes de enviar
       final ciudadNormalizada = _normalizarCiudad(ciudad);
 
       final uri = Uri.parse(
-        '$_baseUrl/config/lines',
+        ApiConfig.configLineas,
       ).replace(queryParameters: {'ciudad': ciudadNormalizada});
 
       debugPrint('Cargando líneas para ciudad: $ciudadNormalizada');
@@ -225,7 +218,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Indicador visual
                       Center(
                         child: Container(
                           width: 40,
@@ -254,7 +246,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Selector de Región CON COLORES OSCUROS
+                      // Selector de Región
                       DropdownButtonFormField<String>(
                         isExpanded: true,
                         decoration: InputDecoration(
@@ -273,15 +265,12 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                         ) {
                           final color =
                               _coloresRegion[region['codigo']] ??
-                              const Color(
-                                0xFF424242,
-                              ); // Gris oscuro por defecto
+                              const Color(0xFF424242);
 
                           return DropdownMenuItem<String>(
                             value: region['codigo'],
                             child: Row(
                               children: [
-                                // Indicador de color
                                 Container(
                                   width: 12,
                                   height: 12,
@@ -295,8 +284,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
                                   child: Text(
                                     '${region['codigo']}: ${region['nombre']}',
                                     style: TextStyle(
-                                      color:
-                                          color, // Color oscuro para el texto
+                                      color: color,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -452,7 +440,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
                       const SizedBox(height: 24),
 
-                      // Botón Buscar - AZUL OSCURO
+                      // Botón Buscar
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -543,7 +531,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
         throw Exception('No hay sesión activa');
       }
 
-      // CORRECCIÓN: Normalizar ciudad para la búsqueda también
       final ciudadNormalizada = ciudad != null
           ? _normalizarCiudad(ciudad)
           : null;
@@ -558,7 +545,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
       };
 
       final uri = Uri.parse(
-        '$_baseUrl/geo/nearby-drivers',
+        ApiConfig.geoConductoresCercanos,
       ).replace(queryParameters: queryParams);
 
       debugPrint('Buscando conductores con params: $queryParams');
@@ -844,13 +831,13 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     final prefs = await SharedPreferences.getInstance();
     String nombre = prefs.getString('nombre') ?? '';
     String apellido = prefs.getString('apellido') ?? '';
-    String email = prefs.getString('email') ?? '';
+    String email = prefs.getString('correo') ?? '';
 
     if (nombre.isEmpty || email.isEmpty) {
       final token = prefs.getString('access_token');
       if (token != null) {
         try {
-          final url = Uri.parse('$_baseUrl/users/me');
+          final url = Uri.parse(ApiConfig.usuarioMe);
           final resp = await http.get(
             url,
             headers: {
@@ -862,10 +849,10 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
             final user = jsonDecode(resp.body);
             nombre = (user['nombre'] ?? '').toString();
             apellido = (user['apellido'] ?? '').toString();
-            email = (user['email'] ?? '').toString();
+            email = (user['correo'] ?? '').toString();
             await prefs.setString('nombre', nombre);
             await prefs.setString('apellido', apellido);
-            await prefs.setString('email', email);
+            await prefs.setString('correo', email);
             _networkError = null;
           } else if (resp.statusCode == 401) {
             _networkError =

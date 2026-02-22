@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'api_config.dart';
 
 class HistorialPagoConductorScreen extends StatefulWidget {
   const HistorialPagoConductorScreen({Key? key}) : super(key: key);
@@ -31,9 +32,7 @@ class _HistorialPagoConductorScreenState
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      final url = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/subscriptions/conductor/history',
-      );
+      final url = Uri.parse(ApiConfig.suscripcionHistorial);
       final resp = await http.get(
         url,
         headers: {
@@ -138,9 +137,9 @@ class _HistorialPagoConductorScreenState
           label: const Text("ATRÁS", style: TextStyle(color: Colors.white)),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
+        actions: const [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: EdgeInsets.only(right: 16),
             child: Text(
               "ZUVIROapps",
               style: TextStyle(

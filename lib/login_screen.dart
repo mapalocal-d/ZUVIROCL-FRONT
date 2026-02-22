@@ -3,10 +3,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
+import 'api_config.dart';
 
 final logger = Logger();
-
-const String apiBase = 'https://web-production-ba98d.up.railway.app';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -43,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
 
-    final url = Uri.parse('$apiBase/auth/login');
+    final url = Uri.parse(ApiConfig.login);
 
     try {
       final resp = await http.post(
@@ -63,10 +62,24 @@ class _LoginScreenState extends State<LoginScreen> {
         final data = jsonDecode(resp.body);
 
         final accessToken = data['access_token'];
+        final refreshToken = data['refresh_token'];
         if (accessToken != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('access_token', accessToken);
+          if (refreshToken != null) {
+            await prefs.setString('refresh_token', refreshToken);
+          }
           await prefs.setString('rol', _selectedRole);
+
+          // Guardar datos del usuario si vienen en la respuesta
+          final usuario = data['usuario'];
+          if (usuario != null) {
+            await prefs.setString('nombre', usuario['nombre'] ?? '');
+            await prefs.setString('correo', usuario['correo'] ?? '');
+            if (usuario['uuid'] != null) {
+              await prefs.setString('uuid', usuario['uuid']);
+            }
+          }
         } else {
           setState(() {
             _error = "Login exitoso pero token no recibido.";
@@ -82,7 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('Login exitoso'),
-            content: Text("Bienvenido"),
+            content: const Text("Bienvenido"),
             actions: [
               TextButton(
                 onPressed: () {

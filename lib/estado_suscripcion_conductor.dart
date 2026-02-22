@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'api_config.dart';
 
 class EstadoSuscripcionConductorScreen extends StatefulWidget {
   const EstadoSuscripcionConductorScreen({Key? key}) : super(key: key);
@@ -31,9 +32,7 @@ class _EstadoSuscripcionConductorScreenState
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      final url = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/subscriptions/conductor/status',
-      );
+      final url = Uri.parse(ApiConfig.suscripcionEstado);
       final resp = await http.get(
         url,
         headers: {
@@ -65,7 +64,6 @@ class _EstadoSuscripcionConductorScreenState
 
   Widget _buildDetalle() {
     if (_suscripcion == null) return const SizedBox();
-    // Colores para estado
     Color colorEstado;
     String estadoTexto;
     switch (_suscripcion!['estado']) {
@@ -93,7 +91,7 @@ class _EstadoSuscripcionConductorScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               "Estado de suscripción:",
               style: TextStyle(
                 fontSize: 16,
@@ -161,9 +159,9 @@ class _EstadoSuscripcionConductorScreenState
           label: const Text("ATRÁS", style: TextStyle(color: Colors.white)),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
+        actions: const [
           Padding(
-            padding: const EdgeInsets.only(right: 12.0),
+            padding: EdgeInsets.only(right: 12.0),
             child: Text(
               "ZUVIROapps",
               style: TextStyle(

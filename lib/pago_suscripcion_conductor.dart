@@ -3,9 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
-
-// Importa tu Dashboard de conductor (¡ajusta el path si es diferente!)
 import 'dashboard_conductor.dart';
+import 'api_config.dart';
 
 class PagoSuscripcionConductorScreen extends StatefulWidget {
   const PagoSuscripcionConductorScreen({Key? key}) : super(key: key);
@@ -51,9 +50,7 @@ class _PagoSuscripcionConductorScreenState
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      final url = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/subscriptions/conductor/create',
-      );
+      final url = Uri.parse(ApiConfig.suscripcionCrear);
       int meses = _meses;
       final resp = await http.post(
         url,
@@ -118,9 +115,9 @@ class _PagoSuscripcionConductorScreenState
             );
           },
         ),
-        actions: [
+        actions: const [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: EdgeInsets.only(right: 16),
             child: Text(
               "ZUVIROapps",
               style: TextStyle(
@@ -154,12 +151,12 @@ class _PagoSuscripcionConductorScreenState
                     controller: _mesesController,
                     keyboardType: TextInputType.number,
                     style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: "Meses (1 a 12)",
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      labelStyle: TextStyle(color: Colors.white70),
                       filled: true,
                       fillColor: Colors.black54,
-                      border: const OutlineInputBorder(),
+                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       final n = int.tryParse(value ?? '');

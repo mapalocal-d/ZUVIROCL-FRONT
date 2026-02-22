@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'api_config.dart';
 
 class DashboardConductor extends StatefulWidget {
   const DashboardConductor({Key? key}) : super(key: key);
@@ -86,15 +87,13 @@ class _DashboardConductorState extends State<DashboardConductor> {
     final prefs = await SharedPreferences.getInstance();
     String nombre = prefs.getString('nombre') ?? '';
     String apellido = prefs.getString('apellido') ?? '';
-    String email = prefs.getString('email') ?? '';
+    String email = prefs.getString('correo') ?? '';
 
     if (nombre.isEmpty || email.isEmpty) {
       final token = prefs.getString('access_token');
       if (token != null) {
         try {
-          final url = Uri.parse(
-            'https://graceful-balance-production-ef1d.up.railway.app/users/me',
-          );
+          final url = Uri.parse(ApiConfig.usuarioMe);
           final resp = await http.get(
             url,
             headers: {
@@ -106,10 +105,10 @@ class _DashboardConductorState extends State<DashboardConductor> {
             final user = jsonDecode(resp.body);
             nombre = (user['nombre'] ?? '').toString();
             apellido = (user['apellido'] ?? '').toString();
-            email = (user['email'] ?? '').toString();
+            email = (user['correo'] ?? '').toString();
             await prefs.setString('nombre', nombre);
             await prefs.setString('apellido', apellido);
-            await prefs.setString('email', email);
+            await prefs.setString('correo', email);
             _networkError = null;
           } else if (resp.statusCode == 401) {
             _networkError =

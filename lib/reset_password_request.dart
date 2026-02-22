@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-// Importa la pantalla de confirmación
-import 'reset_password_confirm_conductor.dart';
+import 'reset_password_confirm.dart';
+import 'api_config.dart';
 
-class ResetPasswordRequestConductorScreen extends StatefulWidget {
-  const ResetPasswordRequestConductorScreen({super.key});
+class ResetPasswordRequestScreen extends StatefulWidget {
+  final String rol;
+  const ResetPasswordRequestScreen({super.key, required this.rol});
 
   @override
-  State<ResetPasswordRequestConductorScreen> createState() =>
-      _ResetPasswordRequestConductorScreenState();
+  State<ResetPasswordRequestScreen> createState() =>
+      _ResetPasswordRequestScreenState();
 }
 
-class _ResetPasswordRequestConductorScreenState
-    extends State<ResetPasswordRequestConductorScreen> {
+class _ResetPasswordRequestScreenState
+    extends State<ResetPasswordRequestScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _loading = false;
   String? _error;
   String? _success;
+
+  String get _rolLabel => widget.rol == "conductor" ? "Conductor" : "Pasajero";
 
   Future<void> _requestCode() async {
     if (!_formKey.currentState!.validate()) return;
@@ -28,14 +31,15 @@ class _ResetPasswordRequestConductorScreenState
       _success = null;
     });
 
-    final url = Uri.parse(
-      'https://graceful-balance-production-ef1d.up.railway.app/auth/reset-password/request/conductor',
-    );
+    final url = Uri.parse(ApiConfig.recuperarSolicitar);
     try {
       final resp = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"email": _emailController.text.trim()}),
+        body: jsonEncode({
+          "correo": _emailController.text.trim(),
+          "rol": widget.rol,
+        }),
       );
       if (resp.statusCode == 200) {
         setState(() {
@@ -52,9 +56,7 @@ class _ResetPasswordRequestConductorScreenState
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ResetPasswordConfirmConductorScreen(
-                // Si quieres pasar el email: email: _emailController.text.trim(),
-              ),
+              builder: (_) => ResetPasswordConfirmScreen(rol: widget.rol),
             ),
           );
         }
@@ -77,7 +79,7 @@ class _ResetPasswordRequestConductorScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Recuperar contraseña (Conductor)')),
+      appBar: AppBar(title: Text('Recuperar contraseña ($_rolLabel)')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: Form(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'api_config.dart';
 
 class EstadoSuscripcionPasajeroScreen extends StatefulWidget {
   const EstadoSuscripcionPasajeroScreen({Key? key}) : super(key: key);
@@ -31,9 +32,7 @@ class _EstadoSuscripcionPasajeroScreenState
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      final url = Uri.parse(
-        'https://graceful-balance-production-ef1d.up.railway.app/subscriptions/passenger/status',
-      );
+      final url = Uri.parse(ApiConfig.suscripcionEstado);
       final resp = await http.get(
         url,
         headers: {
@@ -65,7 +64,6 @@ class _EstadoSuscripcionPasajeroScreenState
 
   Widget _buildDetalle() {
     if (_suscripcion == null) return const SizedBox();
-    // Colores para estado
     Color colorEstado;
     String estadoTexto;
     switch (_suscripcion!['estado']) {
@@ -93,7 +91,7 @@ class _EstadoSuscripcionPasajeroScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               "Estado de suscripción:",
               style: TextStyle(
                 fontSize: 16,
@@ -112,7 +110,7 @@ class _EstadoSuscripcionPasajeroScreenState
             ),
             const SizedBox(height: 8),
             Text(
-              "¿Suscripción activa?: ${_suscripcion!['esta_activo'] ? "Sí" : "No"}",
+              "¿Suscripción activa?: ${_suscripcion!['esta_activo'] == true ? "Sí" : "No"}",
               style: const TextStyle(color: Colors.white),
             ),
             Text(
@@ -120,7 +118,7 @@ class _EstadoSuscripcionPasajeroScreenState
               style: const TextStyle(color: Colors.white),
             ),
             Text(
-              "Precio mensual: \$${_suscripcion!['precio_mensual']} CLP",
+              "Precio mensual: \$${_suscripcion!['precio_mensual'] ?? "-"} CLP",
               style: const TextStyle(color: Colors.white),
             ),
             if (_suscripcion!['fecha_inicio'] != null)
@@ -134,7 +132,7 @@ class _EstadoSuscripcionPasajeroScreenState
                 style: const TextStyle(color: Colors.white),
               ),
             Text(
-              "Días restantes: ${_suscripcion!['dias_restantes']}",
+              "Días restantes: ${_suscripcion!['dias_restantes'] ?? "-"}",
               style: const TextStyle(color: Colors.white),
             ),
           ],
@@ -161,9 +159,9 @@ class _EstadoSuscripcionPasajeroScreenState
           label: const Text("ATRÁS", style: TextStyle(color: Colors.white)),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
+        actions: const [
           Padding(
-            padding: const EdgeInsets.only(right: 12.0),
+            padding: EdgeInsets.only(right: 12.0),
             child: Text(
               "ZUVIROapps",
               style: TextStyle(

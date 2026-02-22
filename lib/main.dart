@@ -2,18 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-// Importa todas tus pantallas
 import 'dashboard_conductor.dart';
 import 'dashboard_pasajero.dart';
 import 'register_passenger.dart';
 import 'register_driver.dart';
 import 'login_screen.dart';
-import 'reset_password_request_passenger.dart';
-import 'reset_password_confirm_passenger.dart';
-import 'reset_password_request_conductor.dart';
-import 'reset_password_confirm_conductor.dart';
+import 'reset_password_request.dart';
 import 'root_screen.dart';
-import 'politica_legal.dart'; // <<---- IMPORTANTE
+import 'politica_legal.dart';
 
 void main() {
   runApp(const ZuviroApp());
@@ -76,7 +72,7 @@ class ZuviroApp extends StatelessWidget {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             foregroundColor: accent,
-            side: BorderSide(color: accent, width: 2),
+            side: const BorderSide(color: accent, width: 2),
             textStyle: GoogleFonts.montserrat(
               fontWeight: FontWeight.w600,
               fontSize: 17,
@@ -90,10 +86,10 @@ class ZuviroApp extends StatelessWidget {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: accent2,
-          labelStyle: TextStyle(color: accent),
+          labelStyle: const TextStyle(color: accent),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: accent),
+            borderSide: const BorderSide(color: accent),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
@@ -101,7 +97,7 @@ class ZuviroApp extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: accent, width: 2),
+            borderSide: const BorderSide(color: accent, width: 2),
           ),
         ),
         cardColor: accent2,
@@ -115,13 +111,9 @@ class ZuviroApp extends StatelessWidget {
         '/dashboard_conductor': (_) => const DashboardConductor(),
         '/dashboard_pasajero': (_) => const DashboardPasajero(),
         '/reset-passenger-request': (_) =>
-            const ResetPasswordRequestPassengerScreen(),
-        '/reset-passenger-confirm': (_) =>
-            const ResetPasswordConfirmPassengerScreen(),
+            const ResetPasswordRequestScreen(rol: 'pasajero'),
         '/reset-conductor-request': (_) =>
-            const ResetPasswordRequestConductorScreen(),
-        '/reset-conductor-confirm': (_) =>
-            const ResetPasswordConfirmConductorScreen(),
+            const ResetPasswordRequestScreen(rol: 'conductor'),
       },
     );
   }
@@ -146,7 +138,7 @@ class HomeScreen extends StatelessWidget {
             style: GoogleFonts.montserrat(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF3CDFFF),
+              color: const Color(0xFF3CDFFF),
             ),
           ),
           const SizedBox(height: 6),
@@ -194,7 +186,7 @@ class HomeScreen extends StatelessWidget {
             style: GoogleFonts.montserrat(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF3CDFFF),
+              color: const Color(0xFF3CDFFF),
             ),
           ),
           const SizedBox(height: 6),
@@ -229,9 +221,9 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color accent = Theme.of(context).colorScheme.secondary;
-    final double svgHeight = 190;
+    const double svgHeight = 190;
     final double topSpace = MediaQuery.of(context).size.height < 700 ? 32 : 84;
-    final double buttonMargin = 80;
+    const double buttonMargin = 80;
     final double buttonTopOffset = topSpace + svgHeight + buttonMargin;
 
     return Scaffold(
@@ -239,7 +231,6 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: Stack(
           children: [
-            // SVG más grande
             Positioned(
               right: 0,
               left: 0,
@@ -257,7 +248,6 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // Botones más abajo
             Positioned(
               left: 0,
               right: 0,
@@ -294,7 +284,6 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
             ),
-            // Botón fijo abajo a la izquierda para políticas
             Positioned(
               left: 14,
               bottom: 18,

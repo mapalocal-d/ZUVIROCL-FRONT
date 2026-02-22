@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'api_config.dart';
 
 class LogoutButton extends StatelessWidget {
   const LogoutButton({super.key});
@@ -13,9 +14,7 @@ class LogoutButton extends StatelessWidget {
     if (token != null && token.isNotEmpty) {
       try {
         await http.post(
-          Uri.parse(
-            'https://graceful-balance-production-ef1d.up.railway.app/logout',
-          ),
+          Uri.parse(ApiConfig.logout),
           headers: {"Authorization": "Bearer $token"},
         );
       } catch (_) {
@@ -24,14 +23,10 @@ class LogoutButton extends StatelessWidget {
     }
 
     // 2. Borra toda la sesión local
-    await prefs.clear(); // Borra access_token, rol y todo lo demás
+    await prefs.clear();
 
     // 3. Redirige limpiando todo el stack a la pantalla inicial
-    // Primero cierra el Drawer para evitar errores visuales
-    Navigator.of(
-      context,
-    ).pop(); // Cierra Drawer si existe (seguro, si lo llamas desde Drawer)
-    // Ahora navega a HomeScreen (pantalla principal)
+    Navigator.of(context).pop();
     Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
   }
 
