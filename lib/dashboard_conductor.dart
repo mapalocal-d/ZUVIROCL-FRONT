@@ -52,7 +52,6 @@ class _DashboardConductorState extends State<DashboardConductor>
   bool _suscripcionActiva = true;
   bool _suscripcionCargando = true;
   String _suscripcionEstado = '';
-  int _diasRestantes = 0;
 
   @override
   void initState() {
@@ -90,17 +89,15 @@ class _DashboardConductorState extends State<DashboardConductor>
         final tieneSuscripcion = data['tiene_suscripcion'] == true;
         final estaActivo = data['esta_activo'] == true;
         final estado = data['estado']?.toString() ?? '';
-        final dias = data['dias_restantes'] ?? 0;
 
         setState(() {
           _suscripcionActiva = tieneSuscripcion && estaActivo;
           _suscripcionEstado = estado;
-          _diasRestantes = dias is int ? dias : 0;
           _suscripcionCargando = false;
         });
 
         AppLogger.i(
-          'Suscripción conductor: activa=$_suscripcionActiva, estado=$estado, días=$dias',
+          'Suscripción conductor: activa=$_suscripcionActiva, estado=$estado',
         );
 
         // Si está trabajando y la suscripción se venció, detener

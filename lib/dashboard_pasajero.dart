@@ -53,7 +53,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
   bool _suscripcionActiva = true;
   bool _suscripcionCargando = true;
   String _suscripcionEstado = '';
-  int _diasRestantes = 0;
 
   final Map<String, Color> _coloresRegion = {
     'II': const Color(0xFF1565C0),
@@ -107,17 +106,15 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
         final tieneSuscripcion = data['tiene_suscripcion'] == true;
         final estaActivo = data['esta_activo'] == true;
         final estado = data['estado']?.toString() ?? '';
-        final dias = data['dias_restantes'] ?? 0;
 
         setState(() {
           _suscripcionActiva = tieneSuscripcion && estaActivo;
           _suscripcionEstado = estado;
-          _diasRestantes = dias is int ? dias : 0;
           _suscripcionCargando = false;
         });
 
         AppLogger.i(
-          'Suscripción pasajero: activa=$_suscripcionActiva, estado=$estado, días=$dias',
+          'Suscripción pasajero: activa=$_suscripcionActiva, estado=$estado',
         );
 
         // Si está buscando y la suscripción se venció, detener
