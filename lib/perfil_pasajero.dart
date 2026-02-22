@@ -5,6 +5,62 @@ import 'api_config.dart';
 import 'secure_storage.dart';
 import 'app_logger.dart';
 
+// Alineado al backend: Validadores
+final Set<String> nombresReservados = {
+  'admin',
+  'administrador',
+  'soporte',
+  'root',
+  'moderador',
+  'zuviro',
+  'sistema',
+  'test',
+  'null',
+  'undefined',
+  'api',
+  'webhook',
+  'notification',
+  'user',
+  'usuario',
+  'guest',
+  'invitado',
+  'support',
+  'help',
+  'info',
+  'contact',
+  'noreply',
+  'no-reply',
+  'postmaster',
+  'hostmaster',
+  'webmaster',
+  'abuse',
+};
+
+final Set<String> contrasenasComunes = {
+  'password',
+  '123456',
+  '12345678',
+  'qwerty',
+  'abc123',
+  'zuviro123',
+  'password123',
+  'admin123',
+  'letmein',
+  'welcome',
+  'monkey',
+  '1234567890',
+  'football',
+  'iloveyou',
+};
+
+final List<String> secuenciasTeclado = [
+  'qwerty',
+  'asdfgh',
+  'zxcvbn',
+  '123456',
+  '654321',
+];
+
 class PerfilPasajeroScreen extends StatefulWidget {
   const PerfilPasajeroScreen({super.key});
 
@@ -31,7 +87,6 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
       final resp = await _api.get(ApiConfig.usuarioMe);
       if (resp.statusCode == 200) {
         final user = jsonDecode(resp.body);
-        // Actualizar caché local con los datos más recientes
         await _secure.guardarDatosUsuario(user);
         AppLogger.i('Perfil pasajero cargado y caché actualizado.');
         setState(() {
@@ -53,7 +108,54 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     }
   }
 
+  // ========== VALIDACIONES ALINEADAS AL BACKEND ==========
+
+  // Backend: Validadores.nombre_propio
+  String? _validarNombre(String valor, String campo) {
+    final limpio = valor.trim();
+    if (limpio.isEmpty) return "El $campo es requerido";
+    if (limpio.length < 2) return "El $campo debe tener al menos 2 caracteres";
+    if (limpio.length > 50) return "El $campo no puede superar 50 caracteres";
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$").hasMatch(limpio))
+      return "Solo letras, espacios, apóstrofes y guiones";
+    if (nombresReservados.contains(limpio.toLowerCase()))
+      return "$campo reservado por el sistema";
+    return null;
+  }
+
+  // Backend: Validadores.contrasena (NIST SP 800-63B)
+  String? _validarPassword(String password) {
+    if (password.isEmpty) return "La contraseña es requerida";
+    if (password.length < 8) return "Mínimo 8 caracteres";
+    if (password.length > 128) return "Máximo 128 caracteres";
+    if (password != password.trim())
+      return "No debe tener espacios al inicio o final";
+
+    int cumple = 0;
+    if (RegExp(r'[A-Z]').hasMatch(password)) cumple++;
+    if (RegExp(r'[a-z]').hasMatch(password)) cumple++;
+    if (RegExp(r'[0-9]').hasMatch(password)) cumple++;
+    if (RegExp(r'[^A-Za-z0-9\s]').hasMatch(password)) cumple++;
+
+    if (cumple < 3)
+      return "Debe contener al menos 3 de: mayúsculas, minúsculas, números y símbolos";
+
+    if (contrasenasComunes.contains(password.toLowerCase()))
+      return "Contraseña demasiado común";
+
+    for (final seq in secuenciasTeclado) {
+      if (password.toLowerCase().contains(seq))
+        return "Contiene secuencias de teclado predecibles";
+    }
+
+    return null;
+  }
+
+  // ========== EDITAR PERFIL ==========
+
   Future<void> _editarPerfil() async {
+    final formKey = GlobalKey<FormState>();
+
     TextEditingController nombreController = TextEditingController(
       text: _userData?['nombre'] ?? '',
     );
@@ -70,26 +172,31 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
             'Editar datos',
             style: TextStyle(color: Colors.white),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nombreController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre',
-                  labelStyle: TextStyle(color: Colors.white70),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nombreController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  validator: (v) => _validarNombre(v ?? '', 'nombre'),
                 ),
-                style: const TextStyle(color: Colors.white),
-              ),
-              TextField(
-                controller: apellidoController,
-                decoration: const InputDecoration(
-                  labelText: 'Apellido',
-                  labelStyle: TextStyle(color: Colors.white70),
+                TextFormField(
+                  controller: apellidoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Apellido',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  validator: (v) => _validarNombre(v ?? '', 'apellido'),
                 ),
-                style: const TextStyle(color: Colors.white),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -100,7 +207,11 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
               ),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(context, true);
+                }
+              },
               child: Text(
                 'Guardar',
                 style: TextStyle(color: Theme.of(context).primaryColor),
@@ -114,21 +225,21 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     if (resultado == true) {
       try {
         final datosEditados = {
-          "nombre": nombreController.text,
-          "apellido": apellidoController.text,
+          "nombre": nombreController.text.trim(),
+          "apellido": apellidoController.text.trim(),
         };
         final resp = await _api.patch(
           ApiConfig.perfilPasajero,
           body: datosEditados,
         );
         if (resp.statusCode == 200) {
-          // Actualizar caché local con los datos editados
           await _secure.guardarDatosUsuario(datosEditados);
           AppLogger.i('Perfil pasajero editado y caché actualizado.');
           _fetchPerfil();
           _showSuccess('¡Datos actualizados!');
         } else {
-          _showError('No se pudieron actualizar los datos.');
+          final body = jsonDecode(resp.body);
+          _showError(body['detail'] ?? 'No se pudieron actualizar los datos.');
         }
       } catch (e) {
         AppLogger.e('Error editando perfil pasajero', e);
@@ -137,102 +248,117 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     }
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
-    );
-  }
-
-  void _showHelp(String msg) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: emeraldGreen));
-  }
-
-  void _showSuccess(String msg) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: emeraldGreen));
-  }
-
-  bool _validarPassword(String password) {
-    final hasMinLength = password.length >= 8;
-    final hasUppercase = password.contains(RegExp(r'[A-Z]'));
-    final hasNumber = password.contains(RegExp(r'\d'));
-    return hasMinLength && hasUppercase && hasNumber;
-  }
+  // ========== CAMBIAR CONTRASEÑA ==========
 
   Future<void> _cambiarContrasena() async {
+    final formKey = GlobalKey<FormState>();
+
     TextEditingController actualController = TextEditingController();
     TextEditingController nuevaController = TextEditingController();
     TextEditingController confirmarController = TextEditingController();
+    bool showActual = false;
+    bool showNueva = false;
+    bool showConfirmar = false;
 
     final resultado = await showDialog<bool>(
       context: context,
       builder: (context) {
-        String helpMessage = "Mínimo 8 caracteres, una mayúscula y un número.";
         return StatefulBuilder(
-          builder: (ctx, setState) => AlertDialog(
+          builder: (ctx, setDialogState) => AlertDialog(
             backgroundColor: Colors.black87,
             title: const Text(
               'Cambiar contraseña',
               style: TextStyle(color: Colors.white),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: actualController,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Contraseña actual',
-                    labelStyle: TextStyle(color: Colors.white70),
-                  ),
-                ),
-                TextField(
-                  controller: nuevaController,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Nueva contraseña',
-                    labelStyle: TextStyle(color: Colors.white70),
-                  ),
-                  onChanged: (val) {
-                    setState(() {
-                      if (!_validarPassword(val)) {
-                        helpMessage =
-                            "Mínimo 8 caracteres, una mayúscula y un número.";
-                      } else {
-                        helpMessage = "Contraseña válida ✔";
-                      }
-                    });
-                  },
-                ),
-                TextField(
-                  controller: confirmarController,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Confirmar nueva contraseña',
-                    labelStyle: TextStyle(color: Colors.white70),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Builder(
-                  builder: (_) {
-                    return Text(
-                      helpMessage,
-                      style: TextStyle(
-                        color: helpMessage.contains('✔')
-                            ? emeraldGreen
-                            : Colors.redAccent,
-                        fontWeight: FontWeight.bold,
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: actualController,
+                      obscureText: !showActual,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Contraseña actual',
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            showActual
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.white54,
+                          ),
+                          onPressed: () {
+                            setDialogState(() => showActual = !showActual);
+                          },
+                        ),
                       ),
-                    );
-                  },
+                      validator: (v) {
+                        if (v == null || v.isEmpty)
+                          return "Ingresa tu contraseña actual";
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: nuevaController,
+                      obscureText: !showNueva,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Nueva contraseña',
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        helperText:
+                            '8-128 chars. Al menos 3 de: mayúsculas,\nminúsculas, números y símbolos.',
+                        helperStyle: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 12,
+                        ),
+                        helperMaxLines: 2,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            showNueva ? Icons.visibility_off : Icons.visibility,
+                            color: Colors.white54,
+                          ),
+                          onPressed: () {
+                            setDialogState(() => showNueva = !showNueva);
+                          },
+                        ),
+                      ),
+                      validator: (v) => _validarPassword(v ?? ''),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: confirmarController,
+                      obscureText: !showConfirmar,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Confirmar nueva contraseña',
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            showConfirmar
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.white54,
+                          ),
+                          onPressed: () {
+                            setDialogState(
+                              () => showConfirmar = !showConfirmar,
+                            );
+                          },
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v != nuevaController.text)
+                          return "Las contraseñas no coinciden";
+                        return null;
+                      },
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
             actions: [
               TextButton(
@@ -243,7 +369,11 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
                 ),
               ),
               TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.pop(ctx, true);
+                  }
+                },
                 child: Text(
                   'Guardar',
                   style: TextStyle(color: Theme.of(context).primaryColor),
@@ -256,41 +386,28 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     );
 
     if (resultado == true) {
-      final nueva = nuevaController.text;
-      final confirmar = confirmarController.text;
-
-      if (!_validarPassword(nueva)) {
-        _showHelp(
-          'La contraseña debe tener mínimo 8 caracteres, una mayúscula y un número.',
-        );
-        return;
-      }
-      if (nueva != confirmar) {
-        _showError('Las contraseñas no coinciden.');
-        return;
-      }
-
       try {
         final resp = await _api.put(
           ApiConfig.cambiarContrasena,
           body: {
             "contrasena_actual": actualController.text,
-            "contrasena_nueva": nueva,
-            "confirmar_contrasena": confirmar,
+            "contrasena_nueva": nuevaController.text,
+            "confirmar_contrasena": confirmarController.text,
           },
         );
         if (resp.statusCode == 200) {
           _showSuccess('¡Contraseña cambiada exitosamente!');
         } else {
-          _showError(
-            'No se pudo cambiar la contraseña. Código: ${resp.statusCode}',
-          );
+          final body = jsonDecode(resp.body);
+          _showError(body['detail'] ?? 'No se pudo cambiar la contraseña.');
         }
       } catch (err) {
         _showError('Ocurrió un error al cambiar la contraseña.');
       }
     }
   }
+
+  // ========== BORRAR CUENTA ==========
 
   Future<void> _borrarCuenta() async {
     try {
@@ -306,6 +423,22 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
       AppLogger.e('Error borrando cuenta pasajero', e);
     }
   }
+
+  // ========== UTILIDADES UI ==========
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
+    );
+  }
+
+  void _showSuccess(String msg) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: emeraldGreen));
+  }
+
+  // ========== UI ==========
 
   @override
   Widget build(BuildContext context) {
@@ -334,98 +467,100 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Center(
-              child: CircleAvatar(
-                radius: 46,
-                child: Icon(Icons.person, size: 50),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: CircleAvatar(
+                  radius: 46,
+                  child: Icon(Icons.person, size: 50),
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              "Nombre: ${_userData!['nombre'] ?? ''}",
-              style: const TextStyle(fontSize: 20, color: Colors.white),
-            ),
-            Text(
-              "Apellido: ${_userData!['apellido'] ?? ''}",
-              style: const TextStyle(fontSize: 20, color: Colors.white),
-            ),
-            Text(
-              "Email: ${_userData!['correo'] ?? ''}",
-              style: const TextStyle(color: Colors.grey),
-            ),
-            Text(
-              "Ciudad: ${_userData!['ciudad'] ?? ''}",
-              style: const TextStyle(color: Colors.white),
-            ),
-            Text(
-              "Rol: ${_userData!['rol'] ?? ''}",
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 25),
-            ElevatedButton(
-              onPressed: _editarPerfil,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                minimumSize: const Size.fromHeight(40),
+              const SizedBox(height: 18),
+              Text(
+                "Nombre: ${_userData!['nombre'] ?? ''}",
+                style: const TextStyle(fontSize: 20, color: Colors.white),
               ),
-              child: const Text('Editar datos'),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: _cambiarContrasena,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                minimumSize: const Size.fromHeight(40),
+              Text(
+                "Apellido: ${_userData!['apellido'] ?? ''}",
+                style: const TextStyle(fontSize: 20, color: Colors.white),
               ),
-              child: const Text('Cambiar contraseña'),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                minimumSize: const Size.fromHeight(40),
+              Text(
+                "Email: ${_userData!['correo'] ?? ''}",
+                style: const TextStyle(color: Colors.grey),
               ),
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: Colors.black87,
-                    title: const Text(
-                      'Borrar cuenta',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    content: const Text(
-                      '¿Seguro que quieres borrar tu cuenta? Esta acción no se puede deshacer.',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text(
-                          'Cancelar',
-                          style: TextStyle(color: Colors.redAccent),
-                        ),
+              Text(
+                "Ciudad: ${_userData!['ciudad'] ?? ''}",
+                style: const TextStyle(color: Colors.white),
+              ),
+              Text(
+                "Rol: ${_userData!['rol'] ?? ''}",
+                style: const TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 25),
+              ElevatedButton(
+                onPressed: _editarPerfil,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  minimumSize: const Size.fromHeight(40),
+                ),
+                child: const Text('Editar datos'),
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: _cambiarContrasena,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  minimumSize: const Size.fromHeight(40),
+                ),
+                child: const Text('Cambiar contraseña'),
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  minimumSize: const Size.fromHeight(40),
+                ),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: Colors.black87,
+                      title: const Text(
+                        'Borrar cuenta',
+                        style: TextStyle(color: Colors.white),
                       ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: Text(
-                          'Borrar',
-                          style: TextStyle(
-                            color: Theme.of(context).primaryColor,
+                      content: const Text(
+                        '¿Seguro que quieres borrar tu cuenta? Esta acción no se puede deshacer.',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text(
+                            'Cancelar',
+                            style: TextStyle(color: Colors.redAccent),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirm ?? false) _borrarCuenta();
-              },
-              child: const Text('Borrar cuenta'),
-            ),
-          ],
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: Text(
+                            'Borrar',
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm ?? false) _borrarCuenta();
+                },
+                child: const Text('Borrar cuenta'),
+              ),
+            ],
+          ),
         ),
       ),
     );
