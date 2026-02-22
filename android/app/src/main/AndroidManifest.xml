@@ -3,14 +3,13 @@
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
         android:label="zuvirocl_app"
-        android:icon="@mipmap/ic_launcher">
-
-        <meta-data
+        android:icon="@mipmap/ic_launcher"
+        android:extractNativeLibs="true"> <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyBUbQk07WHHLeDBZmHMDa2rNZId7yNBM3U"/>
 
@@ -22,13 +21,20 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
+            
             <meta-data
-                android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme"/>
+                 android:name="flutterEmbedding"
+                 android:value="2" />
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <meta-data
+            android:name="io.flutter.embedding.android.SplashScreenDrawable"
+            android:resource="@drawable/launch_background" />
+            
     </application>
 </manifest>
