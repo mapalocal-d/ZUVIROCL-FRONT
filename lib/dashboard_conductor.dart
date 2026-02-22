@@ -48,6 +48,12 @@ class _DashboardConductorState extends State<DashboardConductor>
   // ========== PASAJEROS CERCANOS ==========
   List<dynamic> _pasajerosCercanos = [];
 
+  // ========== SUSCRIPCIÓN ==========
+  bool _suscripcionActiva = true;
+  bool _suscripcionCargando = true;
+  String _suscripcionEstado = '';
+  int _diasRestantes = 0;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +61,7 @@ class _DashboardConductorState extends State<DashboardConductor>
     _datosUsuarioFuture = _getNombreEmail();
     _loadCurrentLocation();
     _cargarEstadoInicial();
+    _verificarSuscripcion();
   }
 
   @override
@@ -66,6 +73,169 @@ class _DashboardConductorState extends State<DashboardConductor>
       AppLogger.i('App en foreground. Actualizando ubicación.');
       _enviarUbicacion();
     }
+    if (state == AppLifecycleState.resumed) {
+      _verificarSuscripcion();
+    }
+  }
+
+  // ========== VERIFICAR SUSCRIPCIÓN ==========
+
+  Future<void> _verificarSuscripcion() async {
+    setState(() => _suscripcionCargando = true);
+
+    try {
+      final resp = await _api.get(ApiConfig.suscripcionEstado);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final tieneSuscripcion = data['tiene_suscripcion'] == true;
+        final estaActivo = data['esta_activo'] == true;
+        final estado = data['estado']?.toString() ?? '';
+        final dias = data['dias_restantes'] ?? 0;
+
+        setState(() {
+          _suscripcionActiva = tieneSuscripcion && estaActivo;
+          _suscripcionEstado = estado;
+          _diasRestantes = dias is int ? dias : 0;
+          _suscripcionCargando = false;
+        });
+
+        AppLogger.i(
+          'Suscripción conductor: activa=$_suscripcionActiva, estado=$estado, días=$dias',
+        );
+
+        // Si está trabajando y la suscripción se venció, detener
+        if (!_suscripcionActiva && _trabajando) {
+          _detenerEnvioGPS();
+          setState(() {
+            _trabajando = false;
+            _pasajerosCercanos = [];
+            _markers = _markers.where((m) => m.markerId.value == 'me').toSet();
+          });
+          _showSnackBar(
+            '⚠️ Tu suscripción venció. Se detuvo el trabajo automáticamente.',
+          );
+        }
+      } else {
+        setState(() {
+          _suscripcionActiva = false;
+          _suscripcionCargando = false;
+        });
+      }
+    } on SinConexionException {
+      setState(() => _suscripcionCargando = false);
+      AppLogger.w('Sin conexión al verificar suscripción conductor.');
+    } catch (e) {
+      setState(() => _suscripcionCargando = false);
+      AppLogger.e('Error verificando suscripción conductor', e);
+    }
+  }
+
+  // ========== OVERLAY DE SUSCRIPCIÓN ==========
+
+  Widget _buildOverlaySuscripcion() {
+    return Container(
+      color: Colors.black.withOpacity(0.85),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_outline, size: 80, color: Colors.red[400]),
+              const SizedBox(height: 20),
+              const Text(
+                'Suscripción requerida',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _suscripcionEstado == 'expired'
+                    ? 'Tu suscripción ha vencido.\nRenueva para volver a trabajar.'
+                    : 'No tienes una suscripción activa.\nPaga para comenzar a trabajar.',
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PagoSuscripcionConductorScreen(),
+                      ),
+                    ).then((_) => _verificarSuscripcion());
+                  },
+                  icon: const Icon(Icons.payment, color: Colors.white),
+                  label: const Text(
+                    'Pagar suscripción',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue[700],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              if (_suscripcionEstado == 'expired') ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const EstadoSuscripcionConductorScreen(),
+                        ),
+                      ).then((_) => _verificarSuscripcion());
+                    },
+                    icon: const Icon(Icons.autorenew, color: Colors.white),
+                    label: const Text(
+                      'Renovar suscripción',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange[700],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: _verificarSuscripcion,
+                child: const Text(
+                  'Ya pagué, verificar de nuevo',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // ========== ESTADO INICIAL ==========
@@ -133,6 +303,12 @@ class _DashboardConductorState extends State<DashboardConductor>
         AppLogger.d(
           '📍 GPS enviado: ${position.latitude}, ${position.longitude}',
         );
+      } else if (resp.statusCode == 403) {
+        // Suscripción venció mientras trabajaba
+        _detenerEnvioGPS();
+        setState(() => _trabajando = false);
+        _verificarSuscripcion();
+        _showSnackBar('⚠️ Tu suscripción venció. Renueva para continuar.');
       } else {
         AppLogger.w('Error enviando GPS: ${resp.statusCode}');
       }
@@ -144,6 +320,12 @@ class _DashboardConductorState extends State<DashboardConductor>
   // ========== ESTADO DE TRABAJO (#11) ==========
 
   Future<void> _toggleEstadoTrabajo() async {
+    // Verificar suscripción antes de activar trabajo
+    if (!_trabajando && !_suscripcionActiva) {
+      _showSnackBar('❌ Necesitas una suscripción activa para trabajar.');
+      return;
+    }
+
     setState(() => _toggleTrabajoCargando = true);
 
     final nuevoEstado = !_trabajando;
@@ -171,6 +353,9 @@ class _DashboardConductorState extends State<DashboardConductor>
           _showSnackBar('⏸️ Dejaste de trabajar. Ya no eres visible.');
         }
         AppLogger.i('Estado trabajo: ${_trabajando ? "ACTIVO" : "INACTIVO"}');
+      } else if (resp.statusCode == 403) {
+        _verificarSuscripcion();
+        _showSnackBar('❌ Tu suscripción no está activa.');
       } else {
         final body = jsonDecode(resp.body);
         final detail = body['detail'] ?? 'Error al cambiar estado de trabajo.';
@@ -655,7 +840,7 @@ class _DashboardConductorState extends State<DashboardConductor>
                       MaterialPageRoute(
                         builder: (_) => const PagoSuscripcionConductorScreen(),
                       ),
-                    );
+                    ).then((_) => _verificarSuscripcion());
                   },
                 ),
                 ListTile(
@@ -669,7 +854,7 @@ class _DashboardConductorState extends State<DashboardConductor>
                         builder: (_) =>
                             const EstadoSuscripcionConductorScreen(),
                       ),
-                    );
+                    ).then((_) => _verificarSuscripcion());
                   },
                 ),
                 ListTile(
@@ -721,6 +906,7 @@ class _DashboardConductorState extends State<DashboardConductor>
       body: Stack(
         children: [
           mapWidget,
+          // Barra de estado trabajando
           if (_trabajando)
             Positioned(
               top: 0,
@@ -778,43 +964,66 @@ class _DashboardConductorState extends State<DashboardConductor>
                 ),
               ),
             ),
+          // OVERLAY DE SUSCRIPCIÓN
+          if (!_suscripcionCargando && !_suscripcionActiva)
+            _buildOverlaySuscripcion(),
+          // Loading de suscripción
+          if (_suscripcionCargando)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 16),
+                    Text(
+                      'Verificando suscripción...',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _toggleTrabajoCargando ? null : _toggleEstadoTrabajo,
-        icon: _toggleTrabajoCargando
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
+      floatingActionButton: (!_suscripcionCargando && !_suscripcionActiva)
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _toggleTrabajoCargando ? null : _toggleEstadoTrabajo,
+              icon: _toggleTrabajoCargando
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      _trabajando ? Icons.stop : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+              label: Text(
+                _toggleTrabajoCargando
+                    ? 'Cargando...'
+                    : _trabajando
+                    ? 'Dejar de trabajar'
+                    : 'Empezar a trabajar',
+                style: const TextStyle(
                   color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
-              )
-            : Icon(
-                _trabajando ? Icons.stop : Icons.play_arrow,
-                color: Colors.white,
-                size: 28,
               ),
-        label: Text(
-          _toggleTrabajoCargando
-              ? 'Cargando...'
-              : _trabajando
-              ? 'Dejar de trabajar'
-              : 'Empezar a trabajar',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-        backgroundColor: _toggleTrabajoCargando
-            ? Colors.grey
-            : _trabajando
-            ? Colors.red[700]
-            : Colors.green[700],
-        elevation: 4,
-      ),
+              backgroundColor: _toggleTrabajoCargando
+                  ? Colors.grey
+                  : _trabajando
+                  ? Colors.red[700]
+                  : Colors.green[700],
+              elevation: 4,
+            ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }

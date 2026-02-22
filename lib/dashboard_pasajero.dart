@@ -49,6 +49,12 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
   List<dynamic> _regiones = [];
   List<dynamic> _ciudades = [];
 
+  // ========== SUSCRIPCIÓN ==========
+  bool _suscripcionActiva = true;
+  bool _suscripcionCargando = true;
+  String _suscripcionEstado = '';
+  int _diasRestantes = 0;
+
   final Map<String, Color> _coloresRegion = {
     'II': const Color(0xFF1565C0),
     'III': const Color(0xFF2E7D32),
@@ -75,6 +81,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
     _loadCurrentLocation();
     _cargarConfiguracion();
     _cargarMiEstado();
+    _verificarSuscripcion();
   }
 
   @override
@@ -83,6 +90,171 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
       AppLogger.i('App en foreground. Refrescando conductores.');
       _refrescarConductores();
     }
+    if (state == AppLifecycleState.resumed) {
+      _verificarSuscripcion();
+    }
+  }
+
+  // ========== VERIFICAR SUSCRIPCIÓN ==========
+
+  Future<void> _verificarSuscripcion() async {
+    setState(() => _suscripcionCargando = true);
+
+    try {
+      final resp = await _api.get(ApiConfig.suscripcionEstado);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final tieneSuscripcion = data['tiene_suscripcion'] == true;
+        final estaActivo = data['esta_activo'] == true;
+        final estado = data['estado']?.toString() ?? '';
+        final dias = data['dias_restantes'] ?? 0;
+
+        setState(() {
+          _suscripcionActiva = tieneSuscripcion && estaActivo;
+          _suscripcionEstado = estado;
+          _diasRestantes = dias is int ? dias : 0;
+          _suscripcionCargando = false;
+        });
+
+        AppLogger.i(
+          'Suscripción pasajero: activa=$_suscripcionActiva, estado=$estado, días=$dias',
+        );
+
+        // Si está buscando y la suscripción se venció, detener
+        if (!_suscripcionActiva && _buscandoLinea) {
+          _detenerRefreshConductores();
+          setState(() {
+            _buscandoLinea = false;
+            _lineaBuscada = null;
+            _ciudadBuscada = null;
+            _regionBuscada = null;
+            _markers = _markers.where((m) => m.markerId.value == 'yo').toSet();
+          });
+          _mostrarMensaje(
+            '⚠️ Tu suscripción venció. Se detuvo la búsqueda automáticamente.',
+          );
+        }
+      } else {
+        setState(() {
+          _suscripcionActiva = false;
+          _suscripcionCargando = false;
+        });
+      }
+    } on SinConexionException {
+      setState(() => _suscripcionCargando = false);
+      AppLogger.w('Sin conexión al verificar suscripción pasajero.');
+    } catch (e) {
+      setState(() => _suscripcionCargando = false);
+      AppLogger.e('Error verificando suscripción pasajero', e);
+    }
+  }
+
+  // ========== OVERLAY DE SUSCRIPCIÓN ==========
+
+  Widget _buildOverlaySuscripcion() {
+    return Container(
+      color: Colors.black.withOpacity(0.85),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_outline, size: 80, color: Colors.red[400]),
+              const SizedBox(height: 20),
+              const Text(
+                'Suscripción requerida',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _suscripcionEstado == 'expired'
+                    ? 'Tu suscripción ha vencido.\nRenueva para buscar colectivos.'
+                    : 'No tienes una suscripción activa.\nPaga para buscar colectivos.',
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PagoSuscripcionScreen(),
+                      ),
+                    ).then((_) => _verificarSuscripcion());
+                  },
+                  icon: const Icon(Icons.payment, color: Colors.white),
+                  label: const Text(
+                    'Pagar suscripción',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue[700],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              if (_suscripcionEstado == 'expired') ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const EstadoSuscripcionPasajeroScreen(),
+                        ),
+                      ).then((_) => _verificarSuscripcion());
+                    },
+                    icon: const Icon(Icons.autorenew, color: Colors.white),
+                    label: const Text(
+                      'Renovar suscripción',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange[700],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: _verificarSuscripcion,
+                child: const Text(
+                  'Ya pagué, verificar de nuevo',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // ========== UTILIDADES ==========
@@ -131,6 +303,12 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
       return;
     }
 
+    // Verificar suscripción antes de buscar
+    if (!_suscripcionActiva) {
+      _mostrarMensaje('❌ Necesitas una suscripción activa para buscar.');
+      return;
+    }
+
     setState(() => _toggleBusquedaCargando = true);
 
     try {
@@ -157,6 +335,9 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
         AppLogger.i('Búsqueda activada: línea $linea');
 
         await _buscarConductores(linea: linea, region: region, ciudad: ciudad);
+      } else if (resp.statusCode == 403) {
+        _verificarSuscripcion();
+        _mostrarMensaje('❌ Tu suscripción no está activa.');
       } else {
         final body = jsonDecode(resp.body);
         final detail = body['detail'] ?? 'Error al activar búsqueda.';
@@ -352,6 +533,13 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
   // ========== BÚSQUEDA DE CONDUCTORES ==========
 
   void _mostrarBuscadorConductores() {
+    // Verificar suscripción antes de abrir el buscador
+    if (!_suscripcionActiva) {
+      _mostrarMensaje('❌ Necesitas una suscripción activa para buscar.');
+      _verificarSuscripcion();
+      return;
+    }
+
     String? regionSeleccionada;
     String? ciudadSeleccionada;
     String? lineaSeleccionada;
@@ -715,6 +903,8 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
         }
       } else if (response.statusCode == 403) {
         if (!silencioso) {
+          setState(() => _buscandoConductores = false);
+          _verificarSuscripcion();
           _mostrarMensaje(
             'Necesitas una suscripción activa para buscar conductores.',
           );
@@ -1161,7 +1351,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
                       MaterialPageRoute(
                         builder: (_) => const PagoSuscripcionScreen(),
                       ),
-                    );
+                    ).then((_) => _verificarSuscripcion());
                   },
                 ),
                 ListTile(
@@ -1174,7 +1364,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
                       MaterialPageRoute(
                         builder: (_) => const EstadoSuscripcionPasajeroScreen(),
                       ),
-                    );
+                    ).then((_) => _verificarSuscripcion());
                   },
                 ),
                 ListTile(
@@ -1226,6 +1416,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
       body: Stack(
         children: [
           mapaWidget,
+          // Barra superior buscando
           if (_buscandoLinea)
             Positioned(
               top: 0,
@@ -1299,9 +1490,31 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
                 ),
               ),
             ),
+          // OVERLAY DE SUSCRIPCIÓN
+          if (!_suscripcionCargando && !_suscripcionActiva)
+            _buildOverlaySuscripcion(),
+          // Loading de suscripción
+          if (_suscripcionCargando)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 16),
+                    Text(
+                      'Verificando suscripción...',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
-      floatingActionButton: _buscandoLinea
+      floatingActionButton:
+          _buscandoLinea || (!_suscripcionCargando && !_suscripcionActiva)
           ? null
           : FloatingActionButton.extended(
               onPressed: _buscandoConductores || _toggleBusquedaCargando
