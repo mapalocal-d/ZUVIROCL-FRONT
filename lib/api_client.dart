@@ -7,7 +7,6 @@ import 'secure_storage.dart';
 import 'app_logger.dart';
 import 'main.dart' show navigatorKey;
 
-/// Excepción personalizada cuando no hay internet
 class SinConexionException implements Exception {
   @override
   String toString() => 'Sin conexión a internet';
@@ -21,7 +20,8 @@ class ApiClient {
   final _secure = SecureStorage();
   static const Duration _timeout = Duration(seconds: 15);
 
-  /// Verifica si hay conexión a internet
+  // --- UTILIDADES ---
+
   Future<void> _verificarConexion() async {
     final result = await Connectivity().checkConnectivity();
     if (result.contains(ConnectivityResult.none)) {
@@ -29,27 +29,35 @@ class ApiClient {
     }
   }
 
-  /// Cierra sesión y redirige al home cuando el refresh también falla
-  Future<void> _cerrarSesionYRedirigir() async {
-    AppLogger.w('Sesión expirada. Redirigiendo al inicio.');
-    await _secure.clearAll();
+  Future<Map<String, String>> _authHeaders() async {
+    final token = await _secure.getAccessToken() ?? '';
+    return {
+      "Authorization": "Bearer $token",
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    };
+  }
 
+  // --- LÓGICA DE CIERRE DE SESIÓN ---
+
+  Future<void> _cerrarSesionYRedirigir() async {
+    AppLogger.w('Sesión irrecuperable. Redirigiendo al inicio.');
+    await _secure.clearAll();
     final navigator = navigatorKey.currentState;
     if (navigator != null) {
+      // Te manda al home/login y borra todo el historial de navegación
       navigator.pushNamedAndRemoveUntil('/home', (route) => false);
     }
   }
 
+  // --- REFRESH TOKEN (EL CORAZÓN DEL PROBLEMA) ---
+
   Future<bool> _refreshToken() async {
     final refreshToken = await _secure.getRefreshToken();
-
-    if (refreshToken == null || refreshToken.isEmpty) {
-      AppLogger.w('No hay refresh token disponible.');
-      return false;
-    }
+    if (refreshToken == null || refreshToken.isEmpty) return false;
 
     try {
-      AppLogger.i('Intentando renovar token...');
+      AppLogger.i('Intentando renovar token en el backend...');
       final resp = await http
           .post(
             Uri.parse(ApiConfig.refresh),
@@ -65,140 +73,113 @@ class ApiClient {
 
         if (nuevoAccess != null) {
           await _secure.setAccessToken(nuevoAccess);
+          if (nuevoRefresh != null) await _secure.setRefreshToken(nuevoRefresh);
+          AppLogger.i('Tokens actualizados correctamente.');
+          return true;
         }
-        if (nuevoRefresh != null) {
-          await _secure.setRefreshToken(nuevoRefresh);
-        }
-        AppLogger.i('Token renovado exitosamente.');
-        return true;
-      } else {
-        AppLogger.e('Refresh falló con código: ${resp.statusCode}');
       }
+      AppLogger.e('Refresh falló: ${resp.statusCode}');
     } catch (e) {
-      AppLogger.e('Error al renovar token', e);
+      AppLogger.e('Error en _refreshToken', e);
     }
-
     return false;
   }
 
-  Future<Map<String, String>> _authHeaders() async {
-    final token = await _secure.getAccessToken() ?? '';
-    return {
-      "Authorization": "Bearer $token",
-      "Content-Type": "application/json",
-      "accept": "application/json",
-    };
-  }
+  // --- INTERCEPTOR DE ERRORES (EL GUARDIÁN) ---
 
-  /// Maneja el 401: intenta refresh, si falla → cierra sesión y redirige
-  Future<http.Response?> _handle401(
+  /// Esta función centraliza la lógica. Si es 401, refresca. Si es 403, avisa suscripción.
+  Future<http.Response> _procesarRespuesta(
+    http.Response resp,
     Future<http.Response> Function() reintentar,
   ) async {
-    final refreshed = await _refreshToken();
-    if (refreshed) {
-      return await reintentar();
-    } else {
-      await _cerrarSesionYRedirigir();
-      return null;
+    // Caso 401: Token Vencido
+    if (resp.statusCode == 401) {
+      final exito = await _refreshToken();
+      if (exito) {
+        return await reintentar();
+      } else {
+        await _cerrarSesionYRedirigir();
+        return resp;
+      }
     }
+
+    // Caso 403: Falta de pago / Suscripción (Paso 3)
+    if (resp.statusCode == 403) {
+      AppLogger.w('Usuario sin suscripción activa.');
+      // Aquí podrías redirigir a la pantalla de pago
+      navigatorKey.currentState?.pushNamed('/suscripcion');
+      return resp;
+    }
+
+    return resp;
   }
+
+  // --- MÉTODOS PÚBLICOS ---
 
   Future<http.Response> get(String url) async {
     await _verificarConexion();
-    var headers = await _authHeaders();
-    AppLogger.d('GET $url');
-    var resp = await http
-        .get(Uri.parse(url), headers: headers)
-        .timeout(_timeout);
-
-    if (resp.statusCode == 401) {
-      final reintento = await _handle401(() async {
-        final h = await _authHeaders();
-        return await http.get(Uri.parse(url), headers: h).timeout(_timeout);
-      });
-      if (reintento != null) return reintento;
-    }
-    return resp;
+    final h = await _authHeaders();
+    final resp = await http.get(Uri.parse(url), headers: h).timeout(_timeout);
+    return _procesarRespuesta(resp, () async {
+      final newH = await _authHeaders();
+      return await http.get(Uri.parse(url), headers: newH).timeout(_timeout);
+    });
   }
 
   Future<http.Response> post(String url, {Map<String, dynamic>? body}) async {
     await _verificarConexion();
-    var headers = await _authHeaders();
-    final encodedBody = body != null ? jsonEncode(body) : null;
-    AppLogger.d('POST $url');
-    var resp = await http
-        .post(Uri.parse(url), headers: headers, body: encodedBody)
+    final h = await _authHeaders();
+    final encoded = body != null ? jsonEncode(body) : null;
+    final resp = await http
+        .post(Uri.parse(url), headers: h, body: encoded)
         .timeout(_timeout);
-
-    if (resp.statusCode == 401) {
-      final reintento = await _handle401(() async {
-        final h = await _authHeaders();
-        return await http
-            .post(Uri.parse(url), headers: h, body: encodedBody)
-            .timeout(_timeout);
-      });
-      if (reintento != null) return reintento;
-    }
-    return resp;
+    return _procesarRespuesta(resp, () async {
+      final newH = await _authHeaders();
+      return await http
+          .post(Uri.parse(url), headers: newH, body: encoded)
+          .timeout(_timeout);
+    });
   }
 
   Future<http.Response> patch(String url, {Map<String, dynamic>? body}) async {
     await _verificarConexion();
-    var headers = await _authHeaders();
-    final encodedBody = body != null ? jsonEncode(body) : null;
-    AppLogger.d('PATCH $url');
-    var resp = await http
-        .patch(Uri.parse(url), headers: headers, body: encodedBody)
+    final h = await _authHeaders();
+    final encoded = body != null ? jsonEncode(body) : null;
+    final resp = await http
+        .patch(Uri.parse(url), headers: h, body: encoded)
         .timeout(_timeout);
-
-    if (resp.statusCode == 401) {
-      final reintento = await _handle401(() async {
-        final h = await _authHeaders();
-        return await http
-            .patch(Uri.parse(url), headers: h, body: encodedBody)
-            .timeout(_timeout);
-      });
-      if (reintento != null) return reintento;
-    }
-    return resp;
+    return _procesarRespuesta(resp, () async {
+      final newH = await _authHeaders();
+      return await http
+          .patch(Uri.parse(url), headers: newH, body: encoded)
+          .timeout(_timeout);
+    });
   }
 
   Future<http.Response> put(String url, {Map<String, dynamic>? body}) async {
     await _verificarConexion();
-    var headers = await _authHeaders();
-    final encodedBody = body != null ? jsonEncode(body) : null;
-    AppLogger.d('PUT $url');
-    var resp = await http
-        .put(Uri.parse(url), headers: headers, body: encodedBody)
+    final h = await _authHeaders();
+    final encoded = body != null ? jsonEncode(body) : null;
+    final resp = await http
+        .put(Uri.parse(url), headers: h, body: encoded)
         .timeout(_timeout);
-
-    if (resp.statusCode == 401) {
-      final reintento = await _handle401(() async {
-        final h = await _authHeaders();
-        return await http
-            .put(Uri.parse(url), headers: h, body: encodedBody)
-            .timeout(_timeout);
-      });
-      if (reintento != null) return reintento;
-    }
-    return resp;
+    return _procesarRespuesta(resp, () async {
+      final newH = await _authHeaders();
+      return await http
+          .put(Uri.parse(url), headers: newH, body: encoded)
+          .timeout(_timeout);
+    });
   }
 
   Future<http.Response> delete(String url) async {
     await _verificarConexion();
-    var headers = await _authHeaders();
-    AppLogger.d('DELETE $url');
-    var resp = await http
-        .delete(Uri.parse(url), headers: headers)
+    final h = await _authHeaders();
+    final resp = await http
+        .delete(Uri.parse(url), headers: h)
         .timeout(_timeout);
-
-    if (resp.statusCode == 401) {
-      final reintento = await _handle401(() async {
-        final h = await _authHeaders();
-        return await http.delete(Uri.parse(url), headers: h).timeout(_timeout);
-      });
-      if (reintento != null) return reintento;
-    }
-    return resp;
+    return _procesarRespuesta(resp, () async {
+      final newH = await _authHeaders();
+      return await http.delete(Uri.parse(url), headers: newH).timeout(_timeout);
+    });
   }
 }
