@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'dashboard_conductor.dart';
+import 'api_client.dart';
 import 'api_config.dart';
 
 class PagoSuscripcionConductorScreen extends StatefulWidget {
@@ -16,11 +15,12 @@ class PagoSuscripcionConductorScreen extends StatefulWidget {
 
 class _PagoSuscripcionConductorScreenState
     extends State<PagoSuscripcionConductorScreen> {
+  final _api = ApiClient();
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _mesesController = TextEditingController(
     text: '1',
   );
-  final int precioMensual = 7000; // CLP
+  final int precioMensual = 7000;
   bool _loading = false;
   String? _mpInitPoint;
   String? _mensajeError;
@@ -48,17 +48,9 @@ class _PagoSuscripcionConductorScreenState
       _mensajeExito = null;
     });
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      final url = Uri.parse(ApiConfig.suscripcionCrear);
-      int meses = _meses;
-      final resp = await http.post(
-        url,
-        headers: {
-          "Authorization": "Bearer $token",
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({"meses_a_pagar": meses}),
+      final resp = await _api.post(
+        ApiConfig.suscripcionCrear,
+        body: {"meses_a_pagar": _meses},
       );
       final body = jsonDecode(resp.body);
       if (resp.statusCode == 200 && body["mp_init_point"] != null) {

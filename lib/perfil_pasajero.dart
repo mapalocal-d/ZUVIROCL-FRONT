@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'api_client.dart';
 import 'api_config.dart';
 
 class PerfilPasajeroScreen extends StatefulWidget {
@@ -12,6 +12,7 @@ class PerfilPasajeroScreen extends StatefulWidget {
 }
 
 class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
+  final _api = ApiClient();
   Map<String, dynamic>? _userData;
   bool _loading = true;
 
@@ -24,15 +25,8 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
   }
 
   Future<void> _fetchPerfil() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    if (token == null) return;
-    final url = Uri.parse(ApiConfig.usuarioMe);
     try {
-      final resp = await http.get(
-        url,
-        headers: {"Authorization": "Bearer $token"},
-      );
+      final resp = await _api.get(ApiConfig.usuarioMe);
       if (resp.statusCode == 200) {
         setState(() {
           _userData = jsonDecode(resp.body);
@@ -110,21 +104,13 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     );
 
     if (resultado == true) {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      if (token == null) return;
-      final url = Uri.parse(ApiConfig.perfilPasajero);
       try {
-        final resp = await http.patch(
-          url,
-          headers: {
-            "Authorization": "Bearer $token",
-            "Content-Type": "application/json",
-          },
-          body: jsonEncode({
+        final resp = await _api.patch(
+          ApiConfig.perfilPasajero,
+          body: {
             "nombre": nombreController.text,
             "apellido": apellidoController.text,
-          }),
+          },
         );
         if (resp.statusCode == 200) {
           _fetchPerfil();
@@ -270,23 +256,15 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
         _showError('Las contraseñas no coinciden.');
         return;
       }
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      if (token == null) return;
 
-      final url = Uri.parse(ApiConfig.cambiarContrasena);
       try {
-        final resp = await http.put(
-          url,
-          headers: {
-            "Authorization": "Bearer $token",
-            "Content-Type": "application/json",
-          },
-          body: jsonEncode({
+        final resp = await _api.put(
+          ApiConfig.cambiarContrasena,
+          body: {
             "contrasena_actual": actualController.text,
             "contrasena_nueva": nueva,
             "confirmar_contrasena": confirmar,
-          }),
+          },
         );
         if (resp.statusCode == 200) {
           _showSuccess('¡Contraseña cambiada exitosamente!');
@@ -302,16 +280,10 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
   }
 
   Future<void> _borrarCuenta() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    if (token == null) return;
-    final url = Uri.parse(ApiConfig.eliminarCuenta);
     try {
-      final resp = await http.delete(
-        url,
-        headers: {"Authorization": "Bearer $token"},
-      );
+      final resp = await _api.delete(ApiConfig.eliminarCuenta);
       if (resp.statusCode == 200) {
+        final prefs = await SharedPreferences.getInstance();
         await prefs.clear();
         Navigator.of(
           context,

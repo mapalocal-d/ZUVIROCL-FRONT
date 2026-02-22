@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'api_client.dart';
 import 'api_config.dart';
 
 class EstadoSuscripcionConductorScreen extends StatefulWidget {
@@ -14,6 +13,7 @@ class EstadoSuscripcionConductorScreen extends StatefulWidget {
 
 class _EstadoSuscripcionConductorScreenState
     extends State<EstadoSuscripcionConductorScreen> {
+  final _api = ApiClient();
   Map<String, dynamic>? _suscripcion;
   String? _mensajeError;
   bool _loading = true;
@@ -30,16 +30,7 @@ class _EstadoSuscripcionConductorScreenState
       _mensajeError = null;
     });
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      final url = Uri.parse(ApiConfig.suscripcionEstado);
-      final resp = await http.get(
-        url,
-        headers: {
-          "Authorization": "Bearer $token",
-          "accept": "application/json",
-        },
-      );
+      final resp = await _api.get(ApiConfig.suscripcionEstado);
       if (resp.statusCode == 200) {
         final body = jsonDecode(resp.body);
         setState(() {

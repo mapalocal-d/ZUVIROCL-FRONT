@@ -7,10 +7,10 @@ import 'historial_pago_conductor.dart';
 import 'ayuda_soporte.dart';
 import 'logout_button.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'api_client.dart';
 import 'api_config.dart';
 
 class DashboardConductor extends StatefulWidget {
@@ -21,6 +21,7 @@ class DashboardConductor extends StatefulWidget {
 }
 
 class _DashboardConductorState extends State<DashboardConductor> {
+  final _api = ApiClient();
   late Future<Map<String, String>> _datosUsuarioFuture;
   Position? _userPosition;
   GoogleMapController? _mapController;
@@ -90,43 +91,25 @@ class _DashboardConductorState extends State<DashboardConductor> {
     String email = prefs.getString('correo') ?? '';
 
     if (nombre.isEmpty || email.isEmpty) {
-      final token = prefs.getString('access_token');
-      if (token != null) {
-        try {
-          final url = Uri.parse(ApiConfig.usuarioMe);
-          final resp = await http.get(
-            url,
-            headers: {
-              "Authorization": "Bearer $token",
-              "accept": "application/json",
-            },
-          );
-          if (resp.statusCode == 200) {
-            final user = jsonDecode(resp.body);
-            nombre = (user['nombre'] ?? '').toString();
-            apellido = (user['apellido'] ?? '').toString();
-            email = (user['correo'] ?? '').toString();
-            await prefs.setString('nombre', nombre);
-            await prefs.setString('apellido', apellido);
-            await prefs.setString('correo', email);
-            _networkError = null;
-          } else if (resp.statusCode == 401) {
-            _networkError =
-                "Sesión expirada. Por favor, vuelve a iniciar sesión.";
-            _showSnackBar(_networkError!);
-          } else {
-            _networkError =
-                "Error de red (${resp.statusCode}). Intenta más tarde.";
-            _showSnackBar(_networkError!);
-          }
-        } catch (e) {
+      try {
+        final resp = await _api.get(ApiConfig.usuarioMe);
+        if (resp.statusCode == 200) {
+          final user = jsonDecode(resp.body);
+          nombre = (user['nombre'] ?? '').toString();
+          apellido = (user['apellido'] ?? '').toString();
+          email = (user['correo'] ?? '').toString();
+          await prefs.setString('nombre', nombre);
+          await prefs.setString('apellido', apellido);
+          await prefs.setString('correo', email);
+          _networkError = null;
+        } else {
           _networkError =
-              "No se pudo conectar al servidor. Comprueba tu conexión.";
+              "Error de red (${resp.statusCode}). Intenta más tarde.";
           _showSnackBar(_networkError!);
         }
-      } else {
+      } catch (e) {
         _networkError =
-            "Sesión no encontrada. Por favor, inicia sesión de nuevo.";
+            "No se pudo conectar al servidor. Comprueba tu conexión.";
         _showSnackBar(_networkError!);
       }
     }

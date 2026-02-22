@@ -7,11 +7,11 @@ import 'estado_suscripcion_pasajero.dart';
 import 'historial_pago_pasajero.dart';
 import 'ayuda_soporte.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:diacritic/diacritic.dart';
+import 'api_client.dart';
 import 'api_config.dart';
 
 class DashboardPasajero extends StatefulWidget {
@@ -22,6 +22,7 @@ class DashboardPasajero extends StatefulWidget {
 }
 
 class _DashboardPasajeroState extends State<DashboardPasajero> {
+  final _api = ApiClient();
   late Future<Map<String, String>> _datosUsuarioFuture;
   Position? _userPosition;
   GoogleMapController? _mapController;
@@ -52,8 +53,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     'XVI': const Color(0xFF827717),
   };
 
-  static const Duration _timeout = Duration(seconds: 15);
-
   @override
   void initState() {
     super.initState();
@@ -72,12 +71,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
   Future<void> _cargarConfiguracion() async {
     try {
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.configCiudades),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(_timeout);
+      final response = await _api.get(ApiConfig.configCiudades);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -94,16 +88,11 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   Future<List<dynamic>> _cargarLineas(String ciudad) async {
     try {
       final ciudadNormalizada = _normalizarCiudad(ciudad);
-
-      final uri = Uri.parse(
-        ApiConfig.configLineas,
-      ).replace(queryParameters: {'ciudad': ciudadNormalizada});
+      final url = '${ApiConfig.configLineas}?ciudad=$ciudadNormalizada';
 
       debugPrint('Cargando líneas para ciudad: $ciudadNormalizada');
 
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(_timeout);
+      final response = await _api.get(url);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -524,18 +513,11 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     setState(() => _buscandoConductores = true);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-
-      if (token == null) {
-        throw Exception('No hay sesión activa');
-      }
-
       final ciudadNormalizada = ciudad != null
           ? _normalizarCiudad(ciudad)
           : null;
 
-      final queryParams = {
+      final queryParams = <String, String>{
         'linea': linea,
         'radio_km': '7',
         'solo_activos': 'true',
@@ -550,15 +532,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
 
       debugPrint('Buscando conductores con params: $queryParams');
 
-      final response = await http
-          .get(
-            uri,
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Accept': 'application/json',
-            },
-          )
-          .timeout(_timeout);
+      final response = await _api.get(uri.toString());
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -572,8 +546,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
         } else {
           _mostrarMensaje('${conductores.length} conductor(es) encontrados');
         }
-      } else if (response.statusCode == 401) {
-        throw Exception('Sesión expirada. Vuelve a iniciar sesión.');
       } else if (response.statusCode == 403) {
         throw Exception(
           'Necesitas una suscripción activa para buscar conductores.',
@@ -834,43 +806,25 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
     String email = prefs.getString('correo') ?? '';
 
     if (nombre.isEmpty || email.isEmpty) {
-      final token = prefs.getString('access_token');
-      if (token != null) {
-        try {
-          final url = Uri.parse(ApiConfig.usuarioMe);
-          final resp = await http.get(
-            url,
-            headers: {
-              "Authorization": "Bearer $token",
-              "accept": "application/json",
-            },
-          );
-          if (resp.statusCode == 200) {
-            final user = jsonDecode(resp.body);
-            nombre = (user['nombre'] ?? '').toString();
-            apellido = (user['apellido'] ?? '').toString();
-            email = (user['correo'] ?? '').toString();
-            await prefs.setString('nombre', nombre);
-            await prefs.setString('apellido', apellido);
-            await prefs.setString('correo', email);
-            _networkError = null;
-          } else if (resp.statusCode == 401) {
-            _networkError =
-                "Sesión expirada. Por favor, vuelve a iniciar sesión.";
-            _mostrarMensaje(_networkError!);
-          } else {
-            _networkError =
-                "Error de red (${resp.statusCode}). Intenta más tarde.";
-            _mostrarMensaje(_networkError!);
-          }
-        } catch (e) {
+      try {
+        final resp = await _api.get(ApiConfig.usuarioMe);
+        if (resp.statusCode == 200) {
+          final user = jsonDecode(resp.body);
+          nombre = (user['nombre'] ?? '').toString();
+          apellido = (user['apellido'] ?? '').toString();
+          email = (user['correo'] ?? '').toString();
+          await prefs.setString('nombre', nombre);
+          await prefs.setString('apellido', apellido);
+          await prefs.setString('correo', email);
+          _networkError = null;
+        } else {
           _networkError =
-              "No se pudo conectar al servidor. Comprueba tu conexión.";
+              "Error de red (${resp.statusCode}). Intenta más tarde.";
           _mostrarMensaje(_networkError!);
         }
-      } else {
+      } catch (e) {
         _networkError =
-            "Sesión no encontrada. Por favor, inicia sesión de nuevo.";
+            "No se pudo conectar al servidor. Comprueba tu conexión.";
         _mostrarMensaje(_networkError!);
       }
     }
