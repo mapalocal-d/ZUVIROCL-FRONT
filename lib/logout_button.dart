@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 import 'api_config.dart';
+import 'secure_storage.dart';
 
 class LogoutButton extends StatelessWidget {
   const LogoutButton({super.key});
@@ -14,9 +14,8 @@ class LogoutButton extends StatelessWidget {
       // Ignora error: solo para registro en backend
     }
 
-    // 2. Borra toda la sesión local
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    // 2. Borra toda la sesión segura
+    await SecureStorage().clearAll();
 
     // 3. Redirige limpiando todo el stack a la pantalla inicial
     Navigator.of(context).pop();

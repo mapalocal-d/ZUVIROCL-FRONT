@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'api_client.dart';
 import 'api_config.dart';
+import 'secure_storage.dart';
+import 'app_logger.dart';
 
 class PerfilConductorScreen extends StatefulWidget {
   const PerfilConductorScreen({super.key});
@@ -13,6 +14,7 @@ class PerfilConductorScreen extends StatefulWidget {
 
 class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
   final _api = ApiClient();
+  final _secure = SecureStorage();
   Map<String, dynamic>? _userData;
   bool _loading = true;
 
@@ -28,17 +30,23 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
     try {
       final resp = await _api.get(ApiConfig.usuarioMe);
       if (resp.statusCode == 200) {
+        final user = jsonDecode(resp.body);
+        // Actualizar caché local con los datos más recientes
+        await _secure.guardarDatosUsuario(user);
+        AppLogger.i('Perfil conductor cargado y caché actualizado.');
         setState(() {
-          _userData = jsonDecode(resp.body);
+          _userData = user;
           _loading = false;
         });
       } else {
+        AppLogger.w('Error cargando perfil conductor: ${resp.statusCode}');
         setState(() {
           _userData = null;
           _loading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      AppLogger.e('Error en _fetchPerfil conductor', e);
       setState(() {
         _loading = false;
       });
@@ -151,24 +159,29 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
 
     if (resultado == true) {
       try {
+        final datosEditados = {
+          "nombre": nombreController.text,
+          "apellido": apellidoController.text,
+          "region": regionController.text,
+          "ciudad": ciudadController.text,
+          "patente": patenteController.text,
+          "linea_recorrido": lineaRecorridoController.text,
+        };
         final resp = await _api.patch(
           ApiConfig.perfilConductor,
-          body: {
-            "nombre": nombreController.text,
-            "apellido": apellidoController.text,
-            "region": regionController.text,
-            "ciudad": ciudadController.text,
-            "patente": patenteController.text,
-            "linea_recorrido": lineaRecorridoController.text,
-          },
+          body: datosEditados,
         );
         if (resp.statusCode == 200) {
+          // Actualizar caché local con los datos editados
+          await _secure.guardarDatosUsuario(datosEditados);
+          AppLogger.i('Perfil conductor editado y caché actualizado.');
           _fetchPerfil();
           _showSuccess('¡Datos actualizados!');
         } else {
           _showError('No se pudieron actualizar los datos.');
         }
-      } catch (_) {
+      } catch (e) {
+        AppLogger.e('Error editando perfil conductor', e);
         _showError('Ocurrió un error al actualizar.');
       }
     }
@@ -333,13 +346,15 @@ class _PerfilConductorScreenState extends State<PerfilConductorScreen> {
     try {
       final resp = await _api.delete(ApiConfig.eliminarCuenta);
       if (resp.statusCode == 200) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.clear();
+        await _secure.clearAll();
+        AppLogger.i('Cuenta conductor eliminada.');
         Navigator.of(
           context,
         ).pushNamedAndRemoveUntil('/home', (route) => false);
       }
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.e('Error borrando cuenta conductor', e);
+    }
   }
 
   @override

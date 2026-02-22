@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:logger/logger.dart';
+import 'secure_storage.dart';
+import 'app_logger.dart';
 import 'api_config.dart';
-
-final logger = Logger();
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -55,8 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }),
       );
 
-      logger.i('STATUS: ${resp.statusCode}');
-      logger.i('BODY: ${resp.body}');
+      AppLogger.i('LOGIN STATUS: ${resp.statusCode}');
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
@@ -64,21 +61,17 @@ class _LoginScreenState extends State<LoginScreen> {
         final accessToken = data['access_token'];
         final refreshToken = data['refresh_token'];
         if (accessToken != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('access_token', accessToken);
+          final secure = SecureStorage();
+          await secure.setAccessToken(accessToken);
           if (refreshToken != null) {
-            await prefs.setString('refresh_token', refreshToken);
+            await secure.setRefreshToken(refreshToken);
           }
-          await prefs.setString('rol', _selectedRole);
+          await secure.setRol(_selectedRole);
 
           // Guardar datos del usuario si vienen en la respuesta
           final usuario = data['usuario'];
           if (usuario != null) {
-            await prefs.setString('nombre', usuario['nombre'] ?? '');
-            await prefs.setString('correo', usuario['correo'] ?? '');
-            if (usuario['uuid'] != null) {
-              await prefs.setString('uuid', usuario['uuid']);
-            }
+            await secure.guardarDatosUsuario(usuario);
           }
         } else {
           setState(() {
@@ -140,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     } catch (e, s) {
-      logger.e("EXCEPTION: $e\nSTACK: $s");
+      AppLogger.e("Error en login", e, s);
       setState(() {
         _error = "Error de conexión";
       });

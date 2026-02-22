@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'secure_storage.dart';
+import 'app_logger.dart';
 import 'politica_legal.dart';
 import 'api_config.dart';
 
@@ -322,22 +323,19 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
         final accessToken = respBody['access_token'];
         final refreshToken = respBody['refresh_token'];
         if (accessToken != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('access_token', accessToken);
+          final secure = SecureStorage();
+          await secure.setAccessToken(accessToken);
           if (refreshToken != null) {
-            await prefs.setString('refresh_token', refreshToken);
+            await secure.setRefreshToken(refreshToken);
           }
-          await prefs.setString('rol', 'conductor');
+          await secure.setRol('conductor');
 
           final usuario = respBody['usuario'];
           if (usuario != null) {
-            await prefs.setString('nombre', usuario['nombre'] ?? '');
-            await prefs.setString('correo', usuario['correo'] ?? '');
-            if (usuario['uuid'] != null) {
-              await prefs.setString('uuid', usuario['uuid']);
-            }
+            await secure.guardarDatosUsuario(usuario);
           }
         }
+        AppLogger.i('Registro conductor exitoso.');
         messenger.showSnackBar(
           const SnackBar(
             content: Text("¡Registro exitoso! Bienvenido conductor."),
@@ -356,6 +354,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
               (respBody['detail'] ?? "Registro fallido. Intenta nuevamente.")
                   .toString();
         });
+        AppLogger.w('Registro conductor falló: $_error');
         messenger.showSnackBar(
           SnackBar(
             content: Text(_error!),
@@ -364,7 +363,8 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, s) {
+      AppLogger.e('Error en registro conductor', e, s);
       setState(() {
         _error = "Error de conexión";
       });

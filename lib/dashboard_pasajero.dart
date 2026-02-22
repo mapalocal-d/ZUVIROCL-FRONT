@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'perfil_pasajero.dart';
 import 'logout_button.dart';
 import 'pagar_suscripcion_pasajero.dart';
@@ -13,6 +12,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:diacritic/diacritic.dart';
 import 'api_client.dart';
 import 'api_config.dart';
+import 'secure_storage.dart';
+import 'app_logger.dart';
 
 class DashboardPasajero extends StatefulWidget {
   const DashboardPasajero({Key? key}) : super(key: key);
@@ -23,6 +24,7 @@ class DashboardPasajero extends StatefulWidget {
 
 class _DashboardPasajeroState extends State<DashboardPasajero> {
   final _api = ApiClient();
+  final _secure = SecureStorage();
   late Future<Map<String, String>> _datosUsuarioFuture;
   Position? _userPosition;
   GoogleMapController? _mapController;
@@ -81,7 +83,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
         });
       }
     } catch (e) {
-      debugPrint('Error cargando configuración: $e');
+      AppLogger.e('Error cargando configuración', e);
     }
   }
 
@@ -90,20 +92,20 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
       final ciudadNormalizada = _normalizarCiudad(ciudad);
       final url = '${ApiConfig.configLineas}?ciudad=$ciudadNormalizada';
 
-      debugPrint('Cargando líneas para ciudad: $ciudadNormalizada');
+      AppLogger.d('Cargando líneas para ciudad: $ciudadNormalizada');
 
       final response = await _api.get(url);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final lineas = data['lineas'] ?? [];
-        debugPrint('Líneas encontradas: ${lineas.length}');
+        AppLogger.d('Líneas encontradas: ${lineas.length}');
         return lineas;
       } else {
-        debugPrint('Error ${response.statusCode}: ${response.body}');
+        AppLogger.w('Error ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('Error cargando líneas: $e');
+      AppLogger.e('Error cargando líneas', e);
     }
     return [];
   }
@@ -530,7 +532,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
         ApiConfig.geoConductoresCercanos,
       ).replace(queryParameters: queryParams);
 
-      debugPrint('Buscando conductores con params: $queryParams');
+      AppLogger.d('Buscando conductores con params: $queryParams');
 
       final response = await _api.get(uri.toString());
 
@@ -800,34 +802,37 @@ class _DashboardPasajeroState extends State<DashboardPasajero> {
   // ========== DATOS DE USUARIO ==========
 
   Future<Map<String, String>> _getNombreEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    String nombre = prefs.getString('nombre') ?? '';
-    String apellido = prefs.getString('apellido') ?? '';
-    String email = prefs.getString('correo') ?? '';
+    // 1. Cargar datos locales inmediatamente (caché)
+    String nombre = await _secure.getNombre() ?? '';
+    String apellido = await _secure.getApellido() ?? '';
+    String email = await _secure.getCorreo() ?? '';
 
-    if (nombre.isEmpty || email.isEmpty) {
-      try {
-        final resp = await _api.get(ApiConfig.usuarioMe);
-        if (resp.statusCode == 200) {
-          final user = jsonDecode(resp.body);
-          nombre = (user['nombre'] ?? '').toString();
-          apellido = (user['apellido'] ?? '').toString();
-          email = (user['correo'] ?? '').toString();
-          await prefs.setString('nombre', nombre);
-          await prefs.setString('apellido', apellido);
-          await prefs.setString('correo', email);
-          _networkError = null;
-        } else {
-          _networkError =
-              "Error de red (${resp.statusCode}). Intenta más tarde.";
-          _mostrarMensaje(_networkError!);
-        }
-      } catch (e) {
-        _networkError =
-            "No se pudo conectar al servidor. Comprueba tu conexión.";
-        _mostrarMensaje(_networkError!);
+    // 2. Siempre actualizar desde el servidor en background
+    try {
+      final resp = await _api.get(ApiConfig.usuarioMe);
+      if (resp.statusCode == 200) {
+        final user = jsonDecode(resp.body);
+        nombre = (user['nombre'] ?? '').toString();
+        apellido = (user['apellido'] ?? '').toString();
+        email = (user['correo'] ?? '').toString();
+        await _secure.guardarDatosUsuario(user);
+        _networkError = null;
+        AppLogger.i('Datos del pasajero actualizados desde servidor.');
+      } else {
+        _networkError = "Error de red (${resp.statusCode}). Intenta más tarde.";
+        AppLogger.w('Error obteniendo datos del pasajero: ${resp.statusCode}');
+        if (nombre.isEmpty) _mostrarMensaje(_networkError!);
       }
+    } on SinConexionException {
+      _networkError = "Sin conexión. Mostrando datos guardados.";
+      AppLogger.w('Sin conexión en dashboard pasajero.');
+      if (nombre.isEmpty) _mostrarMensaje(_networkError!);
+    } catch (e) {
+      _networkError = "No se pudo conectar al servidor. Comprueba tu conexión.";
+      AppLogger.e('Error en _getNombreEmail pasajero', e);
+      if (nombre.isEmpty) _mostrarMensaje(_networkError!);
     }
+
     final String nombreCompleto =
         ((nombre.isNotEmpty ? nombre : 'Nombre') +
                 (apellido.isNotEmpty ? ' $apellido' : ''))

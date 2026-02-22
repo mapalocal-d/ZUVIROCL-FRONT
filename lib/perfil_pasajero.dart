@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'api_client.dart';
 import 'api_config.dart';
+import 'secure_storage.dart';
+import 'app_logger.dart';
 
 class PerfilPasajeroScreen extends StatefulWidget {
   const PerfilPasajeroScreen({super.key});
@@ -13,6 +14,7 @@ class PerfilPasajeroScreen extends StatefulWidget {
 
 class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
   final _api = ApiClient();
+  final _secure = SecureStorage();
   Map<String, dynamic>? _userData;
   bool _loading = true;
 
@@ -28,17 +30,23 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     try {
       final resp = await _api.get(ApiConfig.usuarioMe);
       if (resp.statusCode == 200) {
+        final user = jsonDecode(resp.body);
+        // Actualizar caché local con los datos más recientes
+        await _secure.guardarDatosUsuario(user);
+        AppLogger.i('Perfil pasajero cargado y caché actualizado.');
         setState(() {
-          _userData = jsonDecode(resp.body);
+          _userData = user;
           _loading = false;
         });
       } else {
+        AppLogger.w('Error cargando perfil pasajero: ${resp.statusCode}');
         setState(() {
           _userData = null;
           _loading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      AppLogger.e('Error en _fetchPerfil pasajero', e);
       setState(() {
         _loading = false;
       });
@@ -105,20 +113,25 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
 
     if (resultado == true) {
       try {
+        final datosEditados = {
+          "nombre": nombreController.text,
+          "apellido": apellidoController.text,
+        };
         final resp = await _api.patch(
           ApiConfig.perfilPasajero,
-          body: {
-            "nombre": nombreController.text,
-            "apellido": apellidoController.text,
-          },
+          body: datosEditados,
         );
         if (resp.statusCode == 200) {
+          // Actualizar caché local con los datos editados
+          await _secure.guardarDatosUsuario(datosEditados);
+          AppLogger.i('Perfil pasajero editado y caché actualizado.');
           _fetchPerfil();
           _showSuccess('¡Datos actualizados!');
         } else {
           _showError('No se pudieron actualizar los datos.');
         }
-      } catch (_) {
+      } catch (e) {
+        AppLogger.e('Error editando perfil pasajero', e);
         _showError('Ocurrió un error al actualizar.');
       }
     }
@@ -283,13 +296,15 @@ class _PerfilPasajeroScreenState extends State<PerfilPasajeroScreen> {
     try {
       final resp = await _api.delete(ApiConfig.eliminarCuenta);
       if (resp.statusCode == 200) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.clear();
+        await _secure.clearAll();
+        AppLogger.i('Cuenta pasajero eliminada.');
         Navigator.of(
           context,
         ).pushNamedAndRemoveUntil('/home', (route) => false);
       }
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.e('Error borrando cuenta pasajero', e);
+    }
   }
 
   @override

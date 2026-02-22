@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'perfil_conductor.dart';
 import 'pago_suscripcion_conductor.dart';
 import 'estado_suscripcion_conductor.dart';
@@ -12,6 +11,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'api_client.dart';
 import 'api_config.dart';
+import 'secure_storage.dart';
+import 'app_logger.dart';
 
 class DashboardConductor extends StatefulWidget {
   const DashboardConductor({Key? key}) : super(key: key);
@@ -22,6 +23,7 @@ class DashboardConductor extends StatefulWidget {
 
 class _DashboardConductorState extends State<DashboardConductor> {
   final _api = ApiClient();
+  final _secure = SecureStorage();
   late Future<Map<String, String>> _datosUsuarioFuture;
   Position? _userPosition;
   GoogleMapController? _mapController;
@@ -85,34 +87,37 @@ class _DashboardConductorState extends State<DashboardConductor> {
   }
 
   Future<Map<String, String>> _getNombreEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    String nombre = prefs.getString('nombre') ?? '';
-    String apellido = prefs.getString('apellido') ?? '';
-    String email = prefs.getString('correo') ?? '';
+    // 1. Cargar datos locales inmediatamente (caché)
+    String nombre = await _secure.getNombre() ?? '';
+    String apellido = await _secure.getApellido() ?? '';
+    String email = await _secure.getCorreo() ?? '';
 
-    if (nombre.isEmpty || email.isEmpty) {
-      try {
-        final resp = await _api.get(ApiConfig.usuarioMe);
-        if (resp.statusCode == 200) {
-          final user = jsonDecode(resp.body);
-          nombre = (user['nombre'] ?? '').toString();
-          apellido = (user['apellido'] ?? '').toString();
-          email = (user['correo'] ?? '').toString();
-          await prefs.setString('nombre', nombre);
-          await prefs.setString('apellido', apellido);
-          await prefs.setString('correo', email);
-          _networkError = null;
-        } else {
-          _networkError =
-              "Error de red (${resp.statusCode}). Intenta más tarde.";
-          _showSnackBar(_networkError!);
-        }
-      } catch (e) {
-        _networkError =
-            "No se pudo conectar al servidor. Comprueba tu conexión.";
-        _showSnackBar(_networkError!);
+    // 2. Siempre actualizar desde el servidor en background
+    try {
+      final resp = await _api.get(ApiConfig.usuarioMe);
+      if (resp.statusCode == 200) {
+        final user = jsonDecode(resp.body);
+        nombre = (user['nombre'] ?? '').toString();
+        apellido = (user['apellido'] ?? '').toString();
+        email = (user['correo'] ?? '').toString();
+        await _secure.guardarDatosUsuario(user);
+        _networkError = null;
+        AppLogger.i('Datos del conductor actualizados desde servidor.');
+      } else {
+        _networkError = "Error de red (${resp.statusCode}). Intenta más tarde.";
+        AppLogger.w('Error obteniendo datos del conductor: ${resp.statusCode}');
+        if (nombre.isEmpty) _showSnackBar(_networkError!);
       }
+    } on SinConexionException {
+      _networkError = "Sin conexión. Mostrando datos guardados.";
+      AppLogger.w('Sin conexión en dashboard conductor.');
+      if (nombre.isEmpty) _showSnackBar(_networkError!);
+    } catch (e) {
+      _networkError = "No se pudo conectar al servidor. Comprueba tu conexión.";
+      AppLogger.e('Error en _getNombreEmail conductor', e);
+      if (nombre.isEmpty) _showSnackBar(_networkError!);
     }
+
     final String nombreCompleto =
         ((nombre.isNotEmpty ? nombre : 'Nombre') +
                 (apellido.isNotEmpty ? ' $apellido' : ''))

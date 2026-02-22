@@ -1,20 +1,38 @@
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'api_config.dart';
+import 'secure_storage.dart';
+import 'app_logger.dart';
 import 'main.dart' show navigatorKey;
+
+/// Excepción personalizada cuando no hay internet
+class SinConexionException implements Exception {
+  @override
+  String toString() => 'Sin conexión a internet';
+}
 
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
   ApiClient._internal();
 
+  final _secure = SecureStorage();
   static const Duration _timeout = Duration(seconds: 15);
+
+  /// Verifica si hay conexión a internet
+  Future<void> _verificarConexion() async {
+    final result = await Connectivity().checkConnectivity();
+    if (result.contains(ConnectivityResult.none)) {
+      throw SinConexionException();
+    }
+  }
 
   /// Cierra sesión y redirige al home cuando el refresh también falla
   Future<void> _cerrarSesionYRedirigir() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    AppLogger.w('Sesión expirada. Redirigiendo al inicio.');
+    await _secure.clearAll();
 
     final navigator = navigatorKey.currentState;
     if (navigator != null) {
@@ -23,12 +41,15 @@ class ApiClient {
   }
 
   Future<bool> _refreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final refreshToken = prefs.getString('refresh_token');
+    final refreshToken = await _secure.getRefreshToken();
 
-    if (refreshToken == null || refreshToken.isEmpty) return false;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      AppLogger.w('No hay refresh token disponible.');
+      return false;
+    }
 
     try {
+      AppLogger.i('Intentando renovar token...');
       final resp = await http
           .post(
             Uri.parse(ApiConfig.refresh),
@@ -43,21 +64,25 @@ class ApiClient {
         final nuevoRefresh = body['refresh_token'];
 
         if (nuevoAccess != null) {
-          await prefs.setString('access_token', nuevoAccess);
+          await _secure.setAccessToken(nuevoAccess);
         }
         if (nuevoRefresh != null) {
-          await prefs.setString('refresh_token', nuevoRefresh);
+          await _secure.setRefreshToken(nuevoRefresh);
         }
+        AppLogger.i('Token renovado exitosamente.');
         return true;
+      } else {
+        AppLogger.e('Refresh falló con código: ${resp.statusCode}');
       }
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.e('Error al renovar token', e);
+    }
 
     return false;
   }
 
   Future<Map<String, String>> _authHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token') ?? '';
+    final token = await _secure.getAccessToken() ?? '';
     return {
       "Authorization": "Bearer $token",
       "Content-Type": "application/json",
@@ -79,7 +104,9 @@ class ApiClient {
   }
 
   Future<http.Response> get(String url) async {
+    await _verificarConexion();
     var headers = await _authHeaders();
+    AppLogger.d('GET $url');
     var resp = await http
         .get(Uri.parse(url), headers: headers)
         .timeout(_timeout);
@@ -95,8 +122,10 @@ class ApiClient {
   }
 
   Future<http.Response> post(String url, {Map<String, dynamic>? body}) async {
+    await _verificarConexion();
     var headers = await _authHeaders();
     final encodedBody = body != null ? jsonEncode(body) : null;
+    AppLogger.d('POST $url');
     var resp = await http
         .post(Uri.parse(url), headers: headers, body: encodedBody)
         .timeout(_timeout);
@@ -114,8 +143,10 @@ class ApiClient {
   }
 
   Future<http.Response> patch(String url, {Map<String, dynamic>? body}) async {
+    await _verificarConexion();
     var headers = await _authHeaders();
     final encodedBody = body != null ? jsonEncode(body) : null;
+    AppLogger.d('PATCH $url');
     var resp = await http
         .patch(Uri.parse(url), headers: headers, body: encodedBody)
         .timeout(_timeout);
@@ -133,8 +164,10 @@ class ApiClient {
   }
 
   Future<http.Response> put(String url, {Map<String, dynamic>? body}) async {
+    await _verificarConexion();
     var headers = await _authHeaders();
     final encodedBody = body != null ? jsonEncode(body) : null;
+    AppLogger.d('PUT $url');
     var resp = await http
         .put(Uri.parse(url), headers: headers, body: encodedBody)
         .timeout(_timeout);
@@ -152,7 +185,9 @@ class ApiClient {
   }
 
   Future<http.Response> delete(String url) async {
+    await _verificarConexion();
     var headers = await _authHeaders();
+    AppLogger.d('DELETE $url');
     var resp = await http
         .delete(Uri.parse(url), headers: headers)
         .timeout(_timeout);
