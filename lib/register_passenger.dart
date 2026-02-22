@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:convert';
 import 'secure_storage.dart';
 import 'app_logger.dart';
@@ -7,19 +8,75 @@ import 'politica_legal.dart';
 import 'api_config.dart';
 
 const emeraldGreen = Color(0xFF50C878);
-final List<String> dominiosProhibidos = [
-  'mailinator',
-  'yopmail',
-  'tempmail',
-  'guerrillamail',
-];
-final List<String> palabrasProhibidas = [
+
+// Alineado al backend: Validadores.DOMINIOS_PROHIBIDOS
+final Set<String> dominiosProhibidos = {
+  'tempmail.com',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'throwawaymail.com',
+  'mailinator.com',
+  'yopmail.com',
+  'sharklasers.com',
+  'getairmail.com',
+  'dispostable.com',
+};
+
+// Alineado al backend: Validadores.NOMBRES_RESERVADOS
+final Set<String> nombresReservados = {
   'admin',
   'administrador',
-  'root',
   'soporte',
+  'root',
   'moderador',
-  'appcl',
+  'zuviro',
+  'sistema',
+  'test',
+  'null',
+  'undefined',
+  'api',
+  'webhook',
+  'notification',
+  'user',
+  'usuario',
+  'guest',
+  'invitado',
+  'support',
+  'help',
+  'info',
+  'contact',
+  'noreply',
+  'no-reply',
+  'postmaster',
+  'hostmaster',
+  'webmaster',
+  'abuse',
+};
+
+// Alineado al backend: Validadores.contrasena
+final Set<String> contrasenasComunes = {
+  'password',
+  '123456',
+  '12345678',
+  'qwerty',
+  'abc123',
+  'zuviro123',
+  'password123',
+  'admin123',
+  'letmein',
+  'welcome',
+  'monkey',
+  '1234567890',
+  'football',
+  'iloveyou',
+};
+
+final List<String> secuenciasTeclado = [
+  'qwerty',
+  'asdfgh',
+  'zxcvbn',
+  '123456',
+  '654321',
 ];
 
 class RegisterPassengerScreen extends StatefulWidget {
@@ -40,12 +97,27 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
   bool _showPassword = false;
   bool _showConfirmPassword = false;
 
+  Timer? _emailDebounce;
+
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _apellidoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+
+  @override
+  void dispose() {
+    _emailDebounce?.cancel();
+    _nombreController.dispose();
+    _apellidoController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  // ========== EMAIL: CHECK BACKEND ==========
 
   Future<bool> emailExisteEnBackend(String email) async {
     final response = await http.get(
@@ -62,8 +134,10 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
     throw Exception('Error consultando disponibilidad');
   }
 
-  void _onEmailChanged(String value) async {
+  void _onEmailChanged(String value) {
+    _emailDebounce?.cancel();
     final email = value.trim();
+
     if (email.isEmpty) {
       setState(() => _emailErrorText = "Ingresa tu email");
       return;
@@ -72,64 +146,81 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
       setState(() => _emailErrorText = "Formato de email inválido");
       return;
     }
-    if (dominiosProhibidos.any((d) => email.contains(d))) {
-      setState(() => _emailErrorText = "No se permiten emails temporales.");
-      return;
-    }
-    setState(() => _checkingEmail = true);
-    try {
-      bool exists = await emailExisteEnBackend(email);
-      setState(() {
-        _emailErrorText = exists ? "Este email ya está registrado" : null;
-      });
-    } catch (e) {
-      setState(() => _emailErrorText = "Error verificando email");
-    }
-    setState(() => _checkingEmail = false);
+
+    setState(() => _emailErrorText = null);
+
+    _emailDebounce = Timer(const Duration(milliseconds: 600), () async {
+      setState(() => _checkingEmail = true);
+      try {
+        bool exists = await emailExisteEnBackend(email);
+        if (mounted) {
+          setState(() {
+            _emailErrorText = exists ? "Este email ya está registrado" : null;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _emailErrorText = "Error verificando email");
+        }
+      }
+      if (mounted) setState(() => _checkingEmail = false);
+    });
   }
 
+  // ========== VALIDACIONES ALINEADAS AL BACKEND ==========
+
+  // Backend: Validadores.nombre_propio
   String? _validateNombre(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
     final nombre = value.trim();
-    if (nombre.length < 2) return "Debe tener al menos 2 letras";
-    if (nombre.length > 50) return "Máximo 50 letras";
-    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(nombre))
-      return "Solo letras y espacios";
-    if (palabrasProhibidas.contains(nombre.toLowerCase()))
+    if (nombre.length < 2) return "Debe tener al menos 2 caracteres";
+    if (nombre.length > 50) return "Máximo 50 caracteres";
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$").hasMatch(nombre))
+      return "Solo letras, espacios, apóstrofes y guiones";
+    if (nombresReservados.contains(nombre.toLowerCase()))
       return "Nombre reservado por el sistema";
     return null;
   }
 
+  // Backend: Validadores.nombre_propio
   String? _validateApellido(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu apellido";
     final apellido = value.trim();
-    if (apellido.length < 2) return "Debe tener al menos 2 letras";
-    if (apellido.length > 50) return "Máximo 50 letras";
-    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(apellido))
-      return "Solo letras y espacios";
-    if (palabrasProhibidas.contains(apellido.toLowerCase()))
+    if (apellido.length < 2) return "Debe tener al menos 2 caracteres";
+    if (apellido.length > 50) return "Máximo 50 caracteres";
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$").hasMatch(apellido))
+      return "Solo letras, espacios, apóstrofes y guiones";
+    if (nombresReservados.contains(apellido.toLowerCase()))
       return "Apellido reservado por el sistema";
     return null;
   }
 
+  // Backend: Validadores.email
   bool _validateFormatoEmail(String? value) {
     if (value == null || value.trim().isEmpty) return false;
     final email = value.trim().toLowerCase();
     if (email.contains(' ')) return false;
-    if (!email.contains('@')) return false;
+    if (email.length > 254) return false;
+    if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email)) return false;
+
     final parts = email.split('@');
     if (parts.length != 2) return false;
-    final parteLocal = parts[0];
+    final local = parts[0];
     final dominio = parts[1];
+
+    if (local.length > 64) return false;
+    if (local.startsWith('.') || local.endsWith('.') || email.contains('..'))
+      return false;
+    if (local.startsWith('-') || local.endsWith('-')) return false;
+    if (!RegExp(r'^[a-z0-9._%+\-]+$').hasMatch(local)) return false;
+
+    if (dominiosProhibidos.contains(dominio)) return false;
     if (dominio.endsWith('.com.com') ||
         dominio.endsWith('.cl.cl') ||
-        dominio.endsWith('.es.es'))
+        dominio.endsWith('.es.es') ||
+        dominio.endsWith('.net.net'))
       return false;
-    if (email.contains('..')) return false;
-    if (parteLocal.startsWith('.') || parteLocal.endsWith('.')) return false;
-    if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email)) return false;
-    if (dominiosProhibidos.any((d) => email.contains(d))) return false;
-    if (RegExp(r'[^\x00-\x7F]').hasMatch(email)) return false;
+
     return true;
   }
 
@@ -141,14 +232,32 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
     return null;
   }
 
+  // Backend: Validadores.contrasena (NIST SP 800-63B)
+  // Requiere al menos 3 de 4: mayúsculas, minúsculas, números, símbolos
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return "Ingresa una contraseña";
     if (value.length < 8) return "Mínimo 8 caracteres";
-    if (value.length > 32) return "Máximo 32 caracteres";
-    if (!RegExp(r'[A-Z]').hasMatch(value))
-      return "La contraseña debe contener al menos una letra mayúscula.";
-    if (!RegExp(r'\d').hasMatch(value))
-      return "La contraseña debe contener al menos un número.";
+    if (value.length > 128) return "Máximo 128 caracteres";
+    if (value != value.trim())
+      return "No debe tener espacios al inicio o final";
+
+    int cumple = 0;
+    if (RegExp(r'[A-Z]').hasMatch(value)) cumple++;
+    if (RegExp(r'[a-z]').hasMatch(value)) cumple++;
+    if (RegExp(r'[0-9]').hasMatch(value)) cumple++;
+    if (RegExp(r'[^A-Za-z0-9\s]').hasMatch(value)) cumple++;
+
+    if (cumple < 3)
+      return "Debe contener al menos 3 de: mayúsculas, minúsculas, números y símbolos";
+
+    if (contrasenasComunes.contains(value.toLowerCase()))
+      return "Contraseña demasiado común. Elige una más única.";
+
+    for (final seq in secuenciasTeclado) {
+      if (value.toLowerCase().contains(seq))
+        return "Contiene secuencias de teclado predecibles";
+    }
+
     return null;
   }
 
@@ -157,6 +266,8 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
       return "Las contraseñas no coinciden";
     return null;
   }
+
+  // ========== REGISTRO ==========
 
   Future<void> _registerPassenger() async {
     if (!_formKey.currentState!.validate() || !_aceptaTerminos) {
@@ -169,9 +280,7 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
       return;
     }
 
-    setState(() {
-      _loading = true;
-    });
+    setState(() => _loading = true);
 
     final url = Uri.parse(ApiConfig.registerPasajero);
     final body = {
@@ -234,8 +343,7 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
       }
     } catch (e, s) {
       AppLogger.e('Error en registro pasajero', e, s);
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Error de conexión."),
           backgroundColor: Colors.red,
@@ -243,11 +351,11 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
         ),
       );
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      setState(() => _loading = false);
     }
   }
+
+  // ========== UI ==========
 
   @override
   Widget build(BuildContext context) {
@@ -357,7 +465,7 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                     horizontal: 11,
                   ),
                   helperText:
-                      "Debe tener entre 8 y 32 caracteres, al menos un número y una mayúscula.",
+                      "8-128 caracteres. Al menos 3 de: mayúsculas, minúsculas, números y símbolos.",
                   helperStyle: const TextStyle(
                     color: emeraldGreen,
                     fontSize: 13.5,
@@ -368,9 +476,7 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                       color: Colors.blue,
                     ),
                     onPressed: () {
-                      setState(() {
-                        _showPassword = !_showPassword;
-                      });
+                      setState(() => _showPassword = !_showPassword);
                     },
                   ),
                 ),
@@ -408,9 +514,9 @@ class _RegisterPassengerScreenState extends State<RegisterPassengerScreen> {
                       color: Colors.blue,
                     ),
                     onPressed: () {
-                      setState(() {
-                        _showConfirmPassword = !_showConfirmPassword;
-                      });
+                      setState(
+                        () => _showConfirmPassword = !_showConfirmPassword,
+                      );
                     },
                   ),
                 ),

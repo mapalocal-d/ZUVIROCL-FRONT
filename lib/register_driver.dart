@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:convert';
 import 'secure_storage.dart';
 import 'app_logger.dart';
@@ -8,19 +9,80 @@ import 'api_config.dart';
 
 const emeraldGreen = Color(0xFF50C878);
 
-final List<String> dominiosProhibidos = [
-  'mailinator',
-  'yopmail',
-  'tempmail',
-  'guerrillamail',
-];
-final List<String> palabrasProhibidas = [
+// Alineado al backend: Validadores.DOMINIOS_PROHIBIDOS
+final Set<String> dominiosProhibidos = {
+  'tempmail.com',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'throwawaymail.com',
+  'mailinator.com',
+  'yopmail.com',
+  'sharklasers.com',
+  'getairmail.com',
+  'dispostable.com',
+};
+
+// Alineado al backend: Validadores.NOMBRES_RESERVADOS
+final Set<String> nombresReservados = {
   'admin',
-  'root',
+  'administrador',
   'soporte',
+  'root',
   'moderador',
-  'appcl',
+  'zuviro',
+  'sistema',
+  'test',
+  'null',
+  'undefined',
+  'api',
+  'webhook',
+  'notification',
+  'user',
+  'usuario',
+  'guest',
+  'invitado',
+  'support',
+  'help',
+  'info',
+  'contact',
+  'noreply',
+  'no-reply',
+  'postmaster',
+  'hostmaster',
+  'webmaster',
+  'abuse',
+};
+
+// Alineado al backend: Validadores.contrasena
+final Set<String> contrasenasComunes = {
+  'password',
+  '123456',
+  '12345678',
+  'qwerty',
+  'abc123',
+  'zuviro123',
+  'password123',
+  'admin123',
+  'letmein',
+  'welcome',
+  'monkey',
+  '1234567890',
+  'football',
+  'iloveyou',
+};
+
+final List<String> secuenciasTeclado = [
+  'qwerty',
+  'asdfgh',
+  'zxcvbn',
+  '123456',
+  '654321',
 ];
+
+// Alineado al backend: Validadores.patente_chilena
+final RegExp patenteModerna = RegExp(r'^[A-Z]{4}[0-9]{2}$');
+final RegExp patenteAntigua = RegExp(r'^[A-Z]{2}[0-9]{4}$');
+final RegExp patenteMoto = RegExp(r'^[A-Z]{3}[0-9]{2}$');
 
 class RegisterDriverScreen extends StatefulWidget {
   const RegisterDriverScreen({super.key});
@@ -38,6 +100,8 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
   bool _checkingEmail = false;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
+
+  Timer? _emailDebounce;
 
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _apellidoController = TextEditingController();
@@ -57,6 +121,26 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
   bool _loadingCities = true;
   bool _loadingLines = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadCiudadesYRegiones();
+  }
+
+  @override
+  void dispose() {
+    _emailDebounce?.cancel();
+    _nombreController.dispose();
+    _apellidoController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _patenteController.dispose();
+    super.dispose();
+  }
+
+  // ========== UTILIDADES ==========
+
   String normalizarCiudad(String? nombre) {
     if (nombre == null) return '';
     return nombre
@@ -68,6 +152,8 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
         .replaceAll('ú', 'u')
         .replaceAll('ñ', 'n');
   }
+
+  // ========== EMAIL: CHECK BACKEND ==========
 
   Future<bool> emailExisteEnBackend(String email) async {
     final response = await http.get(
@@ -84,8 +170,10 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     throw Exception('Error consultando disponibilidad');
   }
 
-  void _onEmailChanged(String value) async {
+  void _onEmailChanged(String value) {
+    _emailDebounce?.cancel();
     final email = value.trim();
+
     if (email.isEmpty) {
       setState(() => _emailErrorText = "Ingresa tu email");
       return;
@@ -94,64 +182,81 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       setState(() => _emailErrorText = "Formato de email inválido");
       return;
     }
-    if (dominiosProhibidos.any((d) => email.contains(d))) {
-      setState(() => _emailErrorText = "No se permiten emails temporales.");
-      return;
-    }
-    setState(() => _checkingEmail = true);
-    try {
-      bool exists = await emailExisteEnBackend(email);
-      setState(() {
-        _emailErrorText = exists ? "Este email ya está registrado" : null;
-      });
-    } catch (e) {
-      setState(() => _emailErrorText = "Error verificando email");
-    }
-    setState(() => _checkingEmail = false);
+
+    setState(() => _emailErrorText = null);
+
+    _emailDebounce = Timer(const Duration(milliseconds: 600), () async {
+      setState(() => _checkingEmail = true);
+      try {
+        bool exists = await emailExisteEnBackend(email);
+        if (mounted) {
+          setState(() {
+            _emailErrorText = exists ? "Este email ya está registrado" : null;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _emailErrorText = "Error verificando email");
+        }
+      }
+      if (mounted) setState(() => _checkingEmail = false);
+    });
   }
 
+  // ========== VALIDACIONES ALINEADAS AL BACKEND ==========
+
+  // Backend: Validadores.nombre_propio
   String? _validateNombre(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu nombre";
     final nombre = value.trim();
-    if (nombre.length < 2) return "Debe tener al menos 2 letras";
-    if (nombre.length > 50) return "Máx 50 letras";
-    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(nombre))
-      return "Solo letras y espacios";
-    if (palabrasProhibidas.contains(nombre.toLowerCase()))
+    if (nombre.length < 2) return "Debe tener al menos 2 caracteres";
+    if (nombre.length > 50) return "Máximo 50 caracteres";
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$").hasMatch(nombre))
+      return "Solo letras, espacios, apóstrofes y guiones";
+    if (nombresReservados.contains(nombre.toLowerCase()))
       return "Nombre reservado por el sistema";
     return null;
   }
 
+  // Backend: Validadores.nombre_propio
   String? _validateApellido(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa tu apellido";
     final apellido = value.trim();
-    if (apellido.length < 2) return "Debe tener al menos 2 letras";
-    if (apellido.length > 50) return "Máx 50 letras";
-    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$").hasMatch(apellido))
-      return "Solo letras y espacios";
-    if (palabrasProhibidas.contains(apellido.toLowerCase()))
+    if (apellido.length < 2) return "Debe tener al menos 2 caracteres";
+    if (apellido.length > 50) return "Máximo 50 caracteres";
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$").hasMatch(apellido))
+      return "Solo letras, espacios, apóstrofes y guiones";
+    if (nombresReservados.contains(apellido.toLowerCase()))
       return "Apellido reservado por el sistema";
     return null;
   }
 
+  // Backend: Validadores.email
   bool _validateFormatoEmail(String? value) {
     if (value == null || value.trim().isEmpty) return false;
     final email = value.trim().toLowerCase();
     if (email.contains(' ')) return false;
-    if (!email.contains('@')) return false;
+    if (email.length > 254) return false;
+    if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email)) return false;
+
     final parts = email.split('@');
     if (parts.length != 2) return false;
-    final parteLocal = parts[0];
+    final local = parts[0];
     final dominio = parts[1];
+
+    if (local.length > 64) return false;
+    if (local.startsWith('.') || local.endsWith('.') || email.contains('..'))
+      return false;
+    if (local.startsWith('-') || local.endsWith('-')) return false;
+    if (!RegExp(r'^[a-z0-9._%+\-]+$').hasMatch(local)) return false;
+
+    if (dominiosProhibidos.contains(dominio)) return false;
     if (dominio.endsWith('.com.com') ||
         dominio.endsWith('.cl.cl') ||
-        dominio.endsWith('.es.es'))
+        dominio.endsWith('.es.es') ||
+        dominio.endsWith('.net.net'))
       return false;
-    if (email.contains('..')) return false;
-    if (parteLocal.startsWith('.') || parteLocal.endsWith('.')) return false;
-    if (!RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email)) return false;
-    if (dominiosProhibidos.any((d) => email.contains(d))) return false;
-    if (RegExp(r'[^\x00-\x7F]').hasMatch(email)) return false;
+
     return true;
   }
 
@@ -163,14 +268,31 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     return null;
   }
 
+  // Backend: Validadores.contrasena (NIST SP 800-63B)
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return "Ingresa una contraseña";
     if (value.length < 8) return "Mínimo 8 caracteres";
-    if (value.length > 32) return "Máximo 32 caracteres";
-    if (!RegExp(r'[A-Z]').hasMatch(value))
-      return "La contraseña debe contener al menos una letra mayúscula.";
-    if (!RegExp(r'\d').hasMatch(value))
-      return "La contraseña debe contener al menos un número.";
+    if (value.length > 128) return "Máximo 128 caracteres";
+    if (value != value.trim())
+      return "No debe tener espacios al inicio o final";
+
+    int cumple = 0;
+    if (RegExp(r'[A-Z]').hasMatch(value)) cumple++;
+    if (RegExp(r'[a-z]').hasMatch(value)) cumple++;
+    if (RegExp(r'[0-9]').hasMatch(value)) cumple++;
+    if (RegExp(r'[^A-Za-z0-9\s]').hasMatch(value)) cumple++;
+
+    if (cumple < 3)
+      return "Debe contener al menos 3 de: mayúsculas, minúsculas, números y símbolos";
+
+    if (contrasenasComunes.contains(value.toLowerCase()))
+      return "Contraseña demasiado común. Elige una más única.";
+
+    for (final seq in secuenciasTeclado) {
+      if (value.toLowerCase().contains(seq))
+        return "Contiene secuencias de teclado predecibles";
+    }
+
     return null;
   }
 
@@ -180,42 +302,54 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     return null;
   }
 
+  // Backend: Field(..., min_length=2, max_length=50)
   String? _validateRegion(String? value) {
     if (value == null || value.isEmpty) return "Elige una región";
-    if (value.length < 2) return "Debe tener al menos 2 letras";
-    if (value.length > 50) return "Máx 50 letras";
+    if (value.length < 2) return "Debe tener al menos 2 caracteres";
+    if (value.length > 50) return "Máximo 50 caracteres";
     return null;
   }
 
+  // Backend: Field(..., min_length=2, max_length=40)
   String? _validateCiudad(String? value) {
     if (value == null || value.isEmpty) return "Elige una ciudad";
-    if (value.length < 2) return "Debe tener al menos 2 letras";
-    if (value.length > 40) return "Máx 40 letras";
+    if (value.length < 2) return "Debe tener al menos 2 caracteres";
+    if (value.length > 40) return "Máximo 40 caracteres";
     return null;
   }
 
+  // Backend: Validadores.patente_chilena
+  // AABB12 (moderna 6), AA1212 (antigua 6), AAA12 (moto 5)
   String? _validatePatente(String? value) {
     if (value == null || value.trim().isEmpty) return "Ingresa la patente";
-    final patente = value.trim().toUpperCase().replaceAll(' ', '');
-    if (patente.length < 6 || patente.length > 10)
-      return "Debe tener de 6 a 10 caracteres";
-    if (!RegExp(r'^[A-Z0-9]+$').hasMatch(patente))
-      return "Solo letras mayúsculas y números";
+    final patente = value.trim().toUpperCase().replaceAll(
+      RegExp(r'[\s.\-·]'),
+      '',
+    );
+
+    if (patente.length < 5 || patente.length > 6)
+      return "La patente debe tener 5 o 6 caracteres";
+
+    if (patente.length == 6) {
+      if (!patenteModerna.hasMatch(patente) &&
+          !patenteAntigua.hasMatch(patente))
+        return "Formato inválido. Ej: AABB12 o AA1212";
+    } else if (patente.length == 5) {
+      if (!patenteMoto.hasMatch(patente))
+        return "Formato inválido. Ej: AAA12 (moto)";
+    }
+
     return null;
   }
 
+  // Backend: Field(..., min_length=1, max_length=10)
   String? _validateLinea(String? value) {
     if (value == null || value.isEmpty) return "Elige una línea o recorrido";
-    if (value.length < 1) return "Debe tener al menos 1 carácter";
-    if (value.length > 20) return "Máx 20 letras";
+    if (value.length > 10) return "Máximo 10 caracteres";
     return null;
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _loadCiudadesYRegiones();
-  }
+  // ========== CARGAR DATOS ==========
 
   Future<void> _loadCiudadesYRegiones() async {
     try {
@@ -279,6 +413,8 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
     }
   }
 
+  // ========== REGISTRO ==========
+
   Future<void> _registerDriver() async {
     if (!_formKey.currentState!.validate() || !_aceptaTerminos) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -304,7 +440,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       "region": _selectedRegion,
       "ciudad": _selectedCiudad,
       "patente": _patenteController.text.trim().toUpperCase().replaceAll(
-        ' ',
+        RegExp(r'[\s.\-·]'),
         '',
       ),
       "linea_recorrido": _selectedLinea,
@@ -365,9 +501,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
       }
     } catch (e, s) {
       AppLogger.e('Error en registro conductor', e, s);
-      setState(() {
-        _error = "Error de conexión";
-      });
+      setState(() => _error = "Error de conexión");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Error de conexión."),
@@ -376,11 +510,11 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
         ),
       );
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      setState(() => _loading = false);
     }
   }
+
+  // ========== UI ==========
 
   @override
   Widget build(BuildContext context) {
@@ -421,16 +555,14 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                 _validatePassword,
                 obscure: !_showPassword,
                 helper:
-                    "Debe tener entre 8 y 32 caracteres, al menos un número y una mayúscula.",
+                    "8-128 caracteres. Al menos 3 de: mayúsculas, minúsculas, números y símbolos.",
                 suffixIcon: IconButton(
                   icon: Icon(
                     _showPassword ? Icons.visibility_off : Icons.visibility,
                     color: Colors.blue,
                   ),
                   onPressed: () {
-                    setState(() {
-                      _showPassword = !_showPassword;
-                    });
+                    setState(() => _showPassword = !_showPassword);
                   },
                 ),
               ),
@@ -448,12 +580,13 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                     color: Colors.blue,
                   ),
                   onPressed: () {
-                    setState(() {
-                      _showConfirmPassword = !_showConfirmPassword;
-                    });
+                    setState(
+                      () => _showConfirmPassword = !_showConfirmPassword,
+                    );
                   },
                 ),
               ),
+              // Región
               Padding(
                 padding: const EdgeInsets.only(bottom: 7),
                 child: Column(
@@ -501,6 +634,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                   ],
                 ),
               ),
+              // Ciudad
               _loadingCities
                   ? const Padding(
                       padding: EdgeInsets.all(8),
@@ -565,13 +699,16 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                         ],
                       ),
                     ),
+              // Patente
               _buildField(
                 _patenteController,
                 'Patente',
                 _validatePatente,
                 textCapitalization: TextCapitalization.characters,
-                helper: "Solo letras mayúsculas y números",
+                helper:
+                    "Formatos: AABB12 (moderna), AA1212 (antigua), AAA12 (moto)",
               ),
+              // Línea
               _selectedCiudad == null
                   ? const SizedBox()
                   : _loadingLines
@@ -635,6 +772,7 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                       ),
                     ),
               const SizedBox(height: 12),
+              // Términos
               Row(
                 children: [
                   Checkbox(
