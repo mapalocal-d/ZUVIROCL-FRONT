@@ -482,6 +482,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
       LocationPermission permission = await Geolocator.requestPermission();
 
       if (permission == LocationPermission.denied) {
+        if (!mounted) return; // Validación de seguridad
         setState(() {
           _loadingLocation = false;
           _locationError =
@@ -492,6 +493,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
       }
 
       if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return; // Validación de seguridad
         setState(() {
           _loadingLocation = false;
           _locationError =
@@ -504,6 +506,9 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
       }
 
       Position position = await Geolocator.getCurrentPosition();
+
+      if (!mounted)
+        return; // Validación de seguridad crítica tras el await del GPS
       setState(() {
         _userPosition = position;
         _loadingLocation = false;
@@ -511,6 +516,7 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
         _actualizarMarcadorUsuario();
       });
     } catch (e) {
+      if (!mounted) return; // Validación de seguridad
       setState(() {
         _loadingLocation = false;
         _locationError = "No se pudo obtener la ubicación. Intenta de nuevo.";
@@ -520,7 +526,8 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
   }
 
   void _actualizarMarcadorUsuario() {
-    if (_userPosition == null) return;
+    // Si el usuario ya no está en la pantalla o la posición es nula, no hacemos nada
+    if (_userPosition == null || !mounted) return;
 
     final marcadorUsuario = Marker(
       markerId: const MarkerId('yo'),
@@ -536,7 +543,6 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
       };
     });
   }
-
   // ========== BÚSQUEDA DE CONDUCTORES ==========
 
   void _mostrarBuscadorConductores() {
