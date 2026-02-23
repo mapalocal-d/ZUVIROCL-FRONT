@@ -20,8 +20,11 @@ class ApiClient {
   final _secure = SecureStorage();
   static const Duration _timeout = Duration(seconds: 15);
 
-  /// [SEMÁFORO] Evita múltiples peticiones de refresh simultáneas
+  /// [SEMÁFORO] Evita múltiples peticiones de refresh simultáneas que bloqueen la sesión en Redis
   Future<bool>? _refreshEnCurso;
+
+  /// Bandera para evitar múltiples redirecciones visuales al mismo tiempo
+  bool _estaRedirigiendo = false;
 
   // --- UTILIDADES ---
 
@@ -44,18 +47,24 @@ class ApiClient {
   // --- CIERRE DE SESIÓN ---
 
   Future<void> _cerrarSesionYRedirigir() async {
+    if (_estaRedirigiendo) return;
+    _estaRedirigiendo = true;
+
     AppLogger.w('Cerrando sesión: Credenciales inválidas o expiradas.');
     await _secure.clearAll();
+
     navigatorKey.currentState?.pushNamedAndRemoveUntil(
       '/home',
       (route) => false,
     );
+
+    // Resetear bandera después de un tiempo para permitir futuras acciones si re-loguea
+    Future.delayed(const Duration(seconds: 2), () => _estaRedirigiendo = false);
   }
 
-  // --- LÓGICA DE REFRESH CON SEMÁFORO ---
+  // --- LÓGICA DE REFRESH CON SEMÁFORO (COMPATIBLE CON FASTAPI) ---
 
   Future<bool> _refreshToken() async {
-    // Si ya hay un refresh ejecutándose, las demás peticiones esperan este mismo Future
     if (_refreshEnCurso != null) {
       AppLogger.i('🔄 Esperando al refresh que ya está en curso...');
       return _refreshEnCurso!;
@@ -67,7 +76,7 @@ class ApiClient {
       final resultado = await _refreshEnCurso!;
       return resultado;
     } finally {
-      _refreshEnCurso = null; // Liberamos el semáforo al terminar
+      _refreshEnCurso = null;
     }
   }
 
@@ -81,19 +90,27 @@ class ApiClient {
           .post(
             Uri.parse(ApiConfig.refresh),
             headers: {"Content-Type": "application/json"},
-            body: jsonEncode({"refresh_token": refreshToken}),
+            body: jsonEncode({
+              "refresh_token":
+                  refreshToken, // Coincide con data: RefreshToken de tu backend
+            }),
           )
           .timeout(_timeout);
 
       if (resp.statusCode == 200) {
         final body = jsonDecode(resp.body);
+
+        // Extraemos las claves según el retorno de tu endpoint FastAPI
         final nuevoAccess = body['access_token'];
         final nuevoRefresh = body['refresh_token'];
 
         if (nuevoAccess != null) {
           await _secure.setAccessToken(nuevoAccess);
-          if (nuevoRefresh != null) await _secure.setRefreshToken(nuevoRefresh);
-          AppLogger.i('✅ Token renovado exitosamente.');
+          // Actualizamos el refresh token ya que tu backend lo rota
+          if (nuevoRefresh != null) {
+            await _secure.setRefreshToken(nuevoRefresh);
+          }
+          AppLogger.i('✅ Tokens renovados y rotados exitosamente.');
           return true;
         }
       }
@@ -110,9 +127,9 @@ class ApiClient {
     http.Response resp,
     Future<http.Response> Function() reintentar,
   ) async {
-    // 401: Token expirado -> Intentamos refresh ordenado
+    // 401: Token expirado
     if (resp.statusCode == 401) {
-      AppLogger.w('⚠️ Error 401 detectado.');
+      AppLogger.w('⚠️ Error 401 detectado. Iniciando validación...');
       final exito = await _refreshToken();
       if (exito) {
         AppLogger.i('🔁 Reintentando petición original con nuevo token...');
@@ -123,10 +140,16 @@ class ApiClient {
       }
     }
 
-    // 403: Falta Suscripción (Paso 3)
+    // 403: Suscripción requerida (Paso 3)
     if (resp.statusCode == 403) {
       AppLogger.w('💳 Error 403: Suscripción requerida.');
-      navigatorKey.currentState?.pushNamed('/suscripcion');
+      // Evitamos abrir múltiples veces la pantalla si hay varias peticiones fallando
+      if (!_estaRedirigiendo) {
+        _estaRedirigiendo = true;
+        navigatorKey.currentState?.pushNamed('/suscripcion').then((_) {
+          _estaRedirigiendo = false;
+        });
+      }
       return resp;
     }
 

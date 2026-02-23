@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
+import 'pagar_suscripcion_pasajero.dart';
 import 'dashboard_conductor.dart';
 import 'dashboard_pasajero.dart';
 import 'register_passenger.dart';
@@ -30,6 +30,7 @@ class ZuviroApp extends StatelessWidget {
     const Color textColor = Color(0xFFE3F2FD);
 
     return MaterialApp(
+      // Clave global para permitir navegación desde el ApiClient sin contexto
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'ZUVIROCL',
@@ -118,6 +119,9 @@ class ZuviroApp extends StatelessWidget {
             const ResetPasswordRequestScreen(rol: 'pasajero'),
         '/reset-conductor-request': (_) =>
             const ResetPasswordRequestScreen(rol: 'conductor'),
+
+        // --- RUTA AGREGADA PARA EL PASO 3 ---
+        '/suscripcion': (_) => const PagoSuscripcionScreen(),
       },
     );
   }
