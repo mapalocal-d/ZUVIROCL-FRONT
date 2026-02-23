@@ -77,18 +77,25 @@ class _DashboardConductorState extends State<DashboardConductor>
     }
   }
 
-  // ========== VERIFICAR SUSCRIPCIÓN ==========
+  // ========== VERIFICAR SUSCRIPCIÓN CONDUCTOR (OPTIMIZADO) ==========
 
   Future<void> _verificarSuscripcion() async {
+    // 1. Evitar múltiples llamadas simultáneas o llamadas cuando el widget ya no existe
+    if (!mounted || _suscripcionCargando) return;
+
     setState(() => _suscripcionCargando = true);
 
     try {
       final resp = await _api.get(ApiConfig.suscripcionEstado);
+
+      // 2. Comprobar si el usuario sigue en esta pantalla tras la respuesta del servidor
+      if (!mounted) return;
+
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-        final tieneSuscripcion = data['tiene_suscripcion'] == true;
-        final estaActivo = data['esta_activo'] == true;
-        final estado = data['estado']?.toString() ?? '';
+        final bool tieneSuscripcion = data['tiene_suscripcion'] == true;
+        final bool estaActivo = data['esta_activo'] == true;
+        final String estado = data['estado']?.toString() ?? '';
 
         setState(() {
           _suscripcionActiva = tieneSuscripcion && estaActivo;
@@ -100,33 +107,43 @@ class _DashboardConductorState extends State<DashboardConductor>
           'Suscripción conductor: activa=$_suscripcionActiva, estado=$estado',
         );
 
-        // Si está trabajando y la suscripción se venció, detener
+        // 3. Lógica Crítica: Si la suscripción no está activa pero el conductor figura como "Trabajando"
         if (!_suscripcionActiva && _trabajando) {
+          // Detenemos el Timer del GPS inmediatamente
           _detenerEnvioGPS();
+
           setState(() {
             _trabajando = false;
             _pasajerosCercanos = [];
+            // Limpiamos el mapa: dejamos solo el marcador del conductor ('me')
             _markers = _markers.where((m) => m.markerId.value == 'me').toSet();
+            // Opcional: Volver a estado 'disponible' o 'fuera de servicio' en el backend
+            _estadoVehiculo = 'disponible';
           });
+
           _showSnackBar(
-            '⚠️ Tu suscripción venció. Se detuvo el trabajo automáticamente.',
+            '⚠️ Suscripción vencida o inactiva. El modo trabajo se ha desactivado.',
           );
         }
       } else {
+        // Si el servidor responde un error (401, 404, 500), por seguridad asumimos inactiva
         setState(() {
           _suscripcionActiva = false;
           _suscripcionCargando = false;
         });
       }
     } on SinConexionException {
-      setState(() => _suscripcionCargando = false);
-      AppLogger.w('Sin conexión al verificar suscripción conductor.');
+      if (mounted) {
+        setState(() => _suscripcionCargando = false);
+        AppLogger.w('Sin conexión al verificar suscripción conductor.');
+      }
     } catch (e) {
-      setState(() => _suscripcionCargando = false);
-      AppLogger.e('Error verificando suscripción conductor', e);
+      if (mounted) {
+        setState(() => _suscripcionCargando = false);
+        AppLogger.e('Error crítico verificando suscripción conductor', e);
+      }
     }
   }
-
   // ========== OVERLAY DE SUSCRIPCIÓN ==========
 
   Widget _buildOverlaySuscripcion() {

@@ -94,13 +94,20 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
     }
   }
 
-  // ========== VERIFICAR SUSCRIPCIÓN ==========
+  // ========== VERIFICAR SUSCRIPCIÓN CORREGIDO ==========
 
   Future<void> _verificarSuscripcion() async {
+    // 1. Evitar llamadas dobles o si el widget ya no existe
+    if (!mounted || _suscripcionCargando) return;
+
     setState(() => _suscripcionCargando = true);
 
     try {
       final resp = await _api.get(ApiConfig.suscripcionEstado);
+
+      // 2. Verificar de nuevo 'mounted' después de una operación asíncrona (el await)
+      if (!mounted) return;
+
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         final tieneSuscripcion = data['tiene_suscripcion'] == true;
@@ -113,11 +120,9 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
           _suscripcionCargando = false;
         });
 
-        AppLogger.i(
-          'Suscripción pasajero: activa=$_suscripcionActiva, estado=$estado',
-        );
+        AppLogger.i('Suscripción: activa=$_suscripcionActiva, estado=$estado');
 
-        // Si está buscando y la suscripción se venció, detener
+        // 3. Lógica de limpieza si la suscripción caducó mientras se usaba la app
         if (!_suscripcionActiva && _buscandoLinea) {
           _detenerRefreshConductores();
           setState(() {
@@ -125,8 +130,10 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
             _lineaBuscada = null;
             _ciudadBuscada = null;
             _regionBuscada = null;
+            // Limpiar marcadores excepto el del usuario
             _markers = _markers.where((m) => m.markerId.value == 'yo').toSet();
           });
+
           _mostrarMensaje(
             '⚠️ Tu suscripción venció. Se detuvo la búsqueda automáticamente.',
           );
@@ -138,14 +145,17 @@ class _DashboardPasajeroState extends State<DashboardPasajero>
         });
       }
     } on SinConexionException {
-      setState(() => _suscripcionCargando = false);
-      AppLogger.w('Sin conexión al verificar suscripción pasajero.');
+      if (mounted) {
+        setState(() => _suscripcionCargando = false);
+        AppLogger.w('Sin conexión al verificar suscripción.');
+      }
     } catch (e) {
-      setState(() => _suscripcionCargando = false);
-      AppLogger.e('Error verificando suscripción pasajero', e);
+      if (mounted) {
+        setState(() => _suscripcionCargando = false);
+        AppLogger.e('Error verificando suscripción', e);
+      }
     }
   }
-
   // ========== OVERLAY DE SUSCRIPCIÓN ==========
 
   Widget _buildOverlaySuscripcion() {

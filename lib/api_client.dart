@@ -20,6 +20,9 @@ class ApiClient {
   final _secure = SecureStorage();
   static const Duration _timeout = Duration(seconds: 15);
 
+  /// [SEMÁFORO] Evita múltiples peticiones de refresh simultáneas
+  Future<bool>? _refreshEnCurso;
+
   // --- UTILIDADES ---
 
   Future<void> _verificarConexion() async {
@@ -38,26 +41,42 @@ class ApiClient {
     };
   }
 
-  // --- LÓGICA DE CIERRE DE SESIÓN ---
+  // --- CIERRE DE SESIÓN ---
 
   Future<void> _cerrarSesionYRedirigir() async {
-    AppLogger.w('Sesión irrecuperable. Redirigiendo al inicio.');
+    AppLogger.w('Cerrando sesión: Credenciales inválidas o expiradas.');
     await _secure.clearAll();
-    final navigator = navigatorKey.currentState;
-    if (navigator != null) {
-      // Te manda al home/login y borra todo el historial de navegación
-      navigator.pushNamedAndRemoveUntil('/home', (route) => false);
+    navigatorKey.currentState?.pushNamedAndRemoveUntil(
+      '/home',
+      (route) => false,
+    );
+  }
+
+  // --- LÓGICA DE REFRESH CON SEMÁFORO ---
+
+  Future<bool> _refreshToken() async {
+    // Si ya hay un refresh ejecutándose, las demás peticiones esperan este mismo Future
+    if (_refreshEnCurso != null) {
+      AppLogger.i('🔄 Esperando al refresh que ya está en curso...');
+      return _refreshEnCurso!;
+    }
+
+    _refreshEnCurso = _ejecutarPeticionRefresh();
+
+    try {
+      final resultado = await _refreshEnCurso!;
+      return resultado;
+    } finally {
+      _refreshEnCurso = null; // Liberamos el semáforo al terminar
     }
   }
 
-  // --- REFRESH TOKEN (EL CORAZÓN DEL PROBLEMA) ---
-
-  Future<bool> _refreshToken() async {
+  Future<bool> _ejecutarPeticionRefresh() async {
     final refreshToken = await _secure.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) return false;
 
     try {
-      AppLogger.i('Intentando renovar token en el backend...');
+      AppLogger.i('🚀 Iniciando Refresh Token ÚNICO...');
       final resp = await http
           .post(
             Uri.parse(ApiConfig.refresh),
@@ -74,28 +93,29 @@ class ApiClient {
         if (nuevoAccess != null) {
           await _secure.setAccessToken(nuevoAccess);
           if (nuevoRefresh != null) await _secure.setRefreshToken(nuevoRefresh);
-          AppLogger.i('Tokens actualizados correctamente.');
+          AppLogger.i('✅ Token renovado exitosamente.');
           return true;
         }
       }
-      AppLogger.e('Refresh falló: ${resp.statusCode}');
+      AppLogger.e('❌ Refresh rechazado por el servidor: ${resp.statusCode}');
     } catch (e) {
-      AppLogger.e('Error en _refreshToken', e);
+      AppLogger.e('💥 Error crítico en _ejecutarPeticionRefresh', e);
     }
     return false;
   }
 
-  // --- INTERCEPTOR DE ERRORES (EL GUARDIÁN) ---
+  // --- MANEJO CENTRALIZADO DE PETICIONES ---
 
-  /// Esta función centraliza la lógica. Si es 401, refresca. Si es 403, avisa suscripción.
   Future<http.Response> _procesarRespuesta(
     http.Response resp,
     Future<http.Response> Function() reintentar,
   ) async {
-    // Caso 401: Token Vencido
+    // 401: Token expirado -> Intentamos refresh ordenado
     if (resp.statusCode == 401) {
+      AppLogger.w('⚠️ Error 401 detectado.');
       final exito = await _refreshToken();
       if (exito) {
+        AppLogger.i('🔁 Reintentando petición original con nuevo token...');
         return await reintentar();
       } else {
         await _cerrarSesionYRedirigir();
@@ -103,10 +123,9 @@ class ApiClient {
       }
     }
 
-    // Caso 403: Falta de pago / Suscripción (Paso 3)
+    // 403: Falta Suscripción (Paso 3)
     if (resp.statusCode == 403) {
-      AppLogger.w('Usuario sin suscripción activa.');
-      // Aquí podrías redirigir a la pantalla de pago
+      AppLogger.w('💳 Error 403: Suscripción requerida.');
       navigatorKey.currentState?.pushNamed('/suscripcion');
       return resp;
     }
@@ -114,7 +133,7 @@ class ApiClient {
     return resp;
   }
 
-  // --- MÉTODOS PÚBLICOS ---
+  // --- MÉTODOS HTTP ---
 
   Future<http.Response> get(String url) async {
     await _verificarConexion();
