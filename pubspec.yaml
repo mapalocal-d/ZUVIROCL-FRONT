@@ -1,36 +1,69 @@
 name: zuvirocl_app
-description: "A new Flutter project."
-publish_to: 'none'
+description: "Zuviro - Transporte Inteligente: Movilidad premium para Chile"
+publish_to: none
 
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.10.7
+  sdk: ">=3.5.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # --- UI & UX ---
   cupertino_icons: ^1.0.8
-  http: ^1.1.0
-  shared_preferences: ^2.2.2
+  google_fonts: ^6.2.1
+  flutter_svg: ^2.0.10+1
+  gap: ^3.0.1
+  flutter_animate: ^4.5.0 
+
+  # --- GESTIÓN DE ESTADO ---
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.3.5
+
+  # --- NAVEGACIÓN ---
+  go_router: ^14.2.7
+
+  # --- NETWORKING ---
+  dio: ^5.5.0
+  pretty_dio_logger: ^1.4.0
+
+  # --- ALMACENAMIENTO ---
   flutter_secure_storage: ^10.0.0
+  shared_preferences: ^2.3.2
+
+  # --- UTILIDADES ---
+  uuid: ^4.4.0
   connectivity_plus: ^7.0.0
-  google_fonts: ^8.0.1
-  flutter_svg: ^2.0.10
-  logger: any
-  url_launcher: ^6.2.5
-  google_maps_flutter: ^2.5.0
-  geolocator: ^14.0.2
-  permission_handler: ^12.0.1
+  logger: ^2.4.0
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
   diacritic: ^0.1.5
+  # --- LA SOLUCIÓN AL ERROR: ---
+  intl: ^0.20.2 
+
+  # --- GEOLOCALIZACIÓN Y MAPAS ---
+  google_maps_flutter: ^2.7.0
+  geolocator: ^13.0.1
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^6.0.0
+  build_runner: ^2.4.13
+  riverpod_generator: ^2.4.0
+  freezed: ^2.5.7
+  json_serializable: ^6.9.0
+  custom_lint: ^0.7.0
+  riverpod_lint: ^2.3.13
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/mapa_demo_actualizado.svg
     - assets/avatar_default.png
+    - assets/mapa_demo_actualizado.svg
