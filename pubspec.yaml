@@ -42,8 +42,8 @@ dependencies:
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0
   diacritic: ^0.1.5
-  # --- LA SOLUCIÓN AL ERROR: ---
   intl: ^0.20.2 
+  device_info_plus: ^10.1.0  # ← AGREGADO: Info del dispositivo para login
 
   # --- GEOLOCALIZACIÓN Y MAPAS ---
   google_maps_flutter: ^2.7.0
