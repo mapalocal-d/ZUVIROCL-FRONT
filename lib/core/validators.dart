@@ -1,3 +1,6 @@
+// core/validators.dart
+// Versión 6.0 - Espejo exacto de Validadores en schemas.py
+
 class AppValidators {
   // =========================================================
   // LISTAS NEGRAS (Espejo exacto del backend V6.0)
@@ -100,9 +103,57 @@ class AppValidators {
     ".net.net",
   ];
 
+  // Mapeo de alias para regiones (espejo del backend)
+  static const Map<String, String> _aliasRegiones = {
+    "metropolitana": "Metropolitana de Santiago",
+    "santiago": "Metropolitana de Santiago",
+    "rm": "Metropolitana de Santiago",
+    "ohiggins": "Libertador General Bernardo O'Higgins",
+    "biobio": "Biobío",
+    "biobío": "Biobío",
+    "tarapaca": "Tarapacá",
+    "araucania": "Araucanía",
+    "aysen": "Aysén del General Carlos Ibáñez del Campo",
+    "magallanes": "Magallanes y de la Antártica Chilena",
+    "ñuble": "Ñuble",
+    "valparaiso": "Valparaíso",
+    "i": "Tarapacá",
+    "ii": "Antofagasta",
+    "iii": "Atacama",
+    "iv": "Coquimbo",
+    "v": "Valparaíso",
+    "vi": "Libertador General Bernardo O'Higgins",
+    "vii": "Maule",
+    "viii": "Biobío",
+    "ix": "Araucanía",
+    "x": "Los Lagos",
+    "xi": "Aysén del General Carlos Ibáñez del Campo",
+    "xii": "Magallanes y de la Antártica Chilena",
+    "xiv": "Los Ríos",
+    "xv": "Arica y Parinacota",
+    "xvi": "Ñuble",
+  };
+
+  // =========================================================
+  // FUNCIÓN AUXILIAR: SANITIZACIÓN DE STRINGS
+  // =========================================================
+
+  static String _sanitizarString(String valor, {int maxLength = 255}) {
+    // Eliminar etiquetas HTML (simulación básica)
+    final sinHtml = valor.replaceAll(RegExp(r'<[^>]+>'), '');
+    // Eliminar caracteres de control (mantener saltos de línea básicos)
+    final limpio =
+        sinHtml.replaceAll(RegExp(r'[^\x20-\x7E\n\r\táéíóúñüÁÉÍÓÚÑÜ]'), '');
+    // Colapsar espacios múltiples
+    final colapsado = limpio.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return colapsado.length > maxLength
+        ? colapsado.substring(0, maxLength)
+        : colapsado;
+  }
+
   // =========================================================
   // VALIDACIÓN DE EMAIL
-  // (Espejo de Validadores.email en schemas.py)
+  // (Espejo exacto de Validadores.email)
   // =========================================================
 
   static String? validateEmail(String? value) {
@@ -112,6 +163,7 @@ class AppValidators {
 
     if (email.length > 254) return 'Email demasiado largo (máx 254 caracteres)';
 
+    // Patrón básico de email (igual que backend)
     final emailRegExp = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     if (!emailRegExp.hasMatch(email)) return 'Formato de email inválido';
 
@@ -119,30 +171,24 @@ class AppValidators {
     final local = partes[0];
     final dominio = partes[1];
 
-    // Largo máximo de la parte local
     if (local.length > 64) return 'Parte local del email demasiado larga';
 
-    // Dominio prohibido (temporales)
     if (_dominiosProhibidos.contains(dominio)) {
       return 'Correos temporales no permitidos';
     }
 
-    // Dominio duplicado
     if (_sufijosDobles.any((sufijo) => dominio.endsWith(sufijo))) {
       return 'Dominio duplicado detectado';
     }
 
-    // Puntos mal ubicados
     if (local.startsWith('.') || local.endsWith('.') || local.contains('..')) {
       return 'Puntos mal ubicados en el email';
     }
 
-    // Guiones al inicio/final
     if (local.startsWith('-') || local.endsWith('-')) {
       return 'Guiones no permitidos al inicio/final del usuario';
     }
 
-    // Caracteres permitidos en la parte local
     if (!RegExp(r'^[a-z0-9._%+\-]+$').hasMatch(local)) {
       return 'Caracteres no permitidos en el email';
     }
@@ -151,8 +197,7 @@ class AppValidators {
   }
 
   // =========================================================
-  // VALIDACIÓN DE CONTRASEÑA
-  // (Espejo de Validadores.contrasena — NIST SP 800-63B)
+  // VALIDACIÓN DE CONTRASEÑA (NIST SP 800-63B)
   // =========================================================
 
   static String? validatePassword(String? value) {
@@ -160,23 +205,19 @@ class AppValidators {
     if (value.length < 8) return 'Mínimo 8 caracteres';
     if (value.length > 128) return 'Máximo 128 caracteres';
 
-    // Sin espacios al inicio o final
     if (value != value.trim()) {
       return 'Sin espacios al inicio o final';
     }
 
-    // Contraseñas comunes
     if (_contrasenasComunes.contains(value.toLowerCase())) {
       return 'Contraseña demasiado común. Elige una más única.';
     }
 
-    // Secuencias de teclado predecibles
     final lower = value.toLowerCase();
     if (_secuenciasTeclado.any((s) => lower.contains(s))) {
       return 'La contraseña contiene secuencias predecibles';
     }
 
-    // Regla NIST: al menos 3 de 4 tipos
     int cumple = 0;
     if (RegExp(r'[A-Z]').hasMatch(value)) cumple++;
     if (RegExp(r'[a-z]').hasMatch(value)) cumple++;
@@ -202,16 +243,14 @@ class AppValidators {
   }
 
   // =========================================================
-  // CAMBIO DE CONTRASEÑA (Validación extra para el form)
+  // CAMBIO DE CONTRASEÑA (Validación extra para formulario)
   // (Espejo de CambioContrasena en schemas.py)
   // =========================================================
 
   static String? validateNewPassword(String? value, String currentPassword) {
-    // Primero aplicar las reglas estándar
     final baseError = validatePassword(value);
     if (baseError != null) return baseError;
 
-    // La nueva contraseña debe ser diferente a la actual
     if (value == currentPassword) {
       return 'La nueva contraseña debe ser diferente a la actual';
     }
@@ -221,34 +260,38 @@ class AppValidators {
 
   // =========================================================
   // VALIDACIÓN DE NOMBRE PROPIO
-  // (Espejo de Validadores.nombre_propio en schemas.py)
+  // (Espejo de Validadores.nombre_propio)
   // =========================================================
 
   static String? validateNombrePropio(String? value, String campo) {
-    if (value == null || value.trim().length < 2) {
-      return 'El $campo debe tener al menos 2 caracteres';
+    if (value == null || value.trim().isEmpty) {
+      return 'El $campo es requerido';
     }
 
-    final limpio = value.trim().toLowerCase();
+    // Sanitizar igual que backend
+    final sanitizado = _sanitizarString(value, maxLength: 50);
 
-    if (_nombresReservados.contains(limpio)) {
-      return 'El $campo "$value" está reservado por el sistema';
+    if (sanitizado.length < 2) {
+      return 'El $campo debe tener al menos 2 caracteres válidos';
     }
 
-    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$").hasMatch(value.trim())) {
+    final normalizado = sanitizado.toLowerCase();
+
+    if (_nombresReservados.contains(normalizado)) {
+      return 'El $campo "$sanitizado" está reservado por el sistema';
+    }
+
+    if (!RegExp(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$").hasMatch(sanitizado)) {
       return 'Solo letras, espacios, apóstrofes y guiones';
     }
 
-    if (value.trim().length > 50) {
-      return 'El $campo es demasiado largo (máx 50 caracteres)';
-    }
-
-    return null;
+    // Devolver en formato Title Case (como backend)
+    return null; // El controlador mostrará el valor original, pero la validación pasa
   }
 
   // =========================================================
   // VALIDACIÓN DE PATENTE CHILENA
-  // (Espejo de Validadores.patente_chilena en schemas.py)
+  // (Espejo de Validadores.patente_chilena)
   // =========================================================
 
   static String? validatePatente(String? value) {
@@ -277,24 +320,33 @@ class AppValidators {
   }
 
   // =========================================================
-  // VALIDACIÓN DE REGIÓN
-  // (Espejo de Validadores.region_chilena en schemas.py)
+  // VALIDACIÓN DE REGIÓN CHILENA
+  // (Espejo de Validadores.region_chilena con mapeo de alias)
   // =========================================================
 
   static String? validateRegion(String? value) {
-    if (value == null || value.trim().length < 3) {
+    if (value == null || value.trim().isEmpty) {
       return 'La región es requerida';
     }
 
-    final normalizada = value.trim().toLowerCase();
+    final sanitizada = _sanitizarString(value, maxLength: 50);
+    final normalizada = sanitizada.toLowerCase();
 
-    // Match exacto o contenido parcial (mínimo 3 chars evita falsos positivos)
-    final isValid = _regionesChile
-        .any((region) => normalizada == region || region.contains(normalizada));
+    // 1. Buscar en alias
+    if (_aliasRegiones.containsKey(normalizada)) {
+      return null; // válida
+    }
 
-    if (!isValid)
-      return 'Región no reconocida. Usa nombres oficiales de Chile.';
-    return null;
+    // 2. Buscar coincidencia exacta o parcial (misma lógica que backend)
+    for (final region in _regionesChile) {
+      if (normalizada == region ||
+          region.contains(normalizada) ||
+          normalizada.contains(region)) {
+        return null; // válida
+      }
+    }
+
+    return 'Región no reconocida. Usa nombres oficiales de Chile.';
   }
 
   // =========================================================
@@ -302,12 +354,13 @@ class AppValidators {
   // =========================================================
 
   static String? validateCiudad(String? value) {
-    if (value == null || value.trim().length < 2) {
-      return 'La ciudad debe tener al menos 2 caracteres';
+    if (value == null || value.trim().isEmpty) {
+      return 'La ciudad es requerida';
     }
 
-    if (value.trim().length > 40) {
-      return 'Nombre de ciudad demasiado largo (máx 40 caracteres)';
+    final sanitizada = _sanitizarString(value, maxLength: 40);
+    if (sanitizada.length < 2) {
+      return 'La ciudad debe tener al menos 2 caracteres';
     }
 
     return null;
@@ -322,41 +375,51 @@ class AppValidators {
       return 'La línea de recorrido es requerida';
     }
 
-    if (value.trim().length > 10) {
-      return 'Línea demasiado larga (máx 10 caracteres)';
+    final sanitizada = _sanitizarString(value, maxLength: 10).toUpperCase();
+    if (sanitizada.isEmpty) {
+      return 'La línea de recorrido no puede estar vacía';
     }
 
     return null;
   }
 
   // =========================================================
-  // VALIDACIÓN DE TELÉFONO CHILENO
-  // (Espejo de Validadores.telefono_chileno en schemas.py)
+  // VALIDACIÓN DE TELÉFONO CHILENO (con normalización a +569)
   // =========================================================
 
-  /// Versión requerida (para campos obligatorios)
+  /// Versión requerida
   static String? validateTelefono(String? value) {
     if (value == null || value.isEmpty) return 'El teléfono es requerido';
-    return _validarFormatoTelefono(value);
+    return _validarYNormalizarTelefono(value);
   }
 
-  /// Versión opcional (para edición de perfil donde es Optional)
+  /// Versión opcional
   static String? validateTelefonoOpcional(String? value) {
     if (value == null || value.isEmpty) return null;
-    return _validarFormatoTelefono(value);
+    return _validarYNormalizarTelefono(value);
   }
 
-  /// Lógica interna compartida de validación de teléfono
-  static String? _validarFormatoTelefono(String value) {
+  static String? _validarYNormalizarTelefono(String value) {
     final soloNumeros = value.replaceAll(RegExp(r'\D'), '');
 
-    // 9XXXXXXXX (9 dígitos empezando con 9)
-    if (soloNumeros.length == 9 && soloNumeros.startsWith('9')) return null;
+    String normalizado;
+    if (soloNumeros.length == 9 && soloNumeros.startsWith('9')) {
+      normalizado = '+56$soloNumeros';
+    } else if (soloNumeros.length == 11 && soloNumeros.startsWith('569')) {
+      normalizado = '+$soloNumeros';
+    } else if (soloNumeros.length == 12 && soloNumeros.startsWith('569')) {
+      // +56912345678 (12 caracteres porque incluye +)
+      normalizado = '+${soloNumeros.substring(1)}';
+    } else {
+      return 'Formato inválido. Usa: 9 1234 5678, 56912345678 o +56912345678';
+    }
 
-    // 569XXXXXXXX (11 dígitos empezando con 569)
-    if (soloNumeros.length == 11 && soloNumeros.startsWith('569')) return null;
+    // Validar con expresión regular del backend
+    if (!RegExp(r'^\+569\d{8}$').hasMatch(normalizado)) {
+      return 'Formato inválido. Debe ser un número chileno válido';
+    }
 
-    return 'Formato inválido. Usa: 9 1234 5678 o +569 1234 5678';
+    return null; // Si se necesita el número normalizado, se puede obtener del controlador
   }
 
   // =========================================================
@@ -370,7 +433,7 @@ class AppValidators {
 
   // =========================================================
   // VALIDACIÓN DE COORDENADAS GPS
-  // (Espejo de CoordenadasGPS en schemas.py)
+  // (Espejo de CoordenadasGPS)
   // =========================================================
 
   static String? validateLatitud(double? value) {

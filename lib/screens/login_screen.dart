@@ -12,6 +12,7 @@ import '../core/services/storage_service.dart';
 import '../core/validators.dart';
 import '../routes/app_routes.dart';
 import '../theme/app_theme.dart';
+import 'support_screen.dart'; // Importar la nueva pantalla de soporte
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -104,33 +105,45 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  /// Obtiene información del dispositivo para enviar en el login.
+  /// En caso de error, devuelve valores por defecto ('web' para el tipo).
   Future<Map<String, String>> _getDeviceInfo() async {
-    final deviceInfo = DeviceInfoPlugin();
-    String tipo;
-    String modelo;
-    String id;
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      String tipo;
+      String modelo;
+      String id;
 
-    if (Platform.isAndroid) {
-      final android = await deviceInfo.androidInfo;
-      tipo = 'android';
-      modelo = '${android.manufacturer} ${android.model}';
-      id = android.id;
-    } else if (Platform.isIOS) {
-      final ios = await deviceInfo.iosInfo;
-      tipo = 'ios';
-      modelo = '${ios.name} ${ios.model}';
-      id = ios.identifierForVendor ?? 'unknown';
-    } else {
-      tipo = 'unknown';
-      modelo = 'Unknown Device';
-      id = 'unknown';
+      if (Platform.isAndroid) {
+        final android = await deviceInfo.androidInfo;
+        tipo = 'android';
+        modelo = '${android.manufacturer} ${android.model}';
+        id = android.id;
+      } else if (Platform.isIOS) {
+        final ios = await deviceInfo.iosInfo;
+        tipo = 'ios';
+        modelo = '${ios.name} ${ios.model}';
+        id = ios.identifierForVendor ?? 'unknown';
+      } else {
+        // Para otras plataformas (web, desktop) usamos 'web' que es válido en el enum
+        tipo = 'web';
+        modelo = 'Unknown Device';
+        id = 'unknown';
+      }
+
+      return {
+        'dispositivo_tipo': tipo,
+        'dispositivo_modelo': modelo,
+        'dispositivo_id': id,
+      };
+    } catch (e) {
+      // Si falla la obtención de información, devolvemos valores seguros
+      return {
+        'dispositivo_tipo': 'web',
+        'dispositivo_modelo': 'Unknown',
+        'dispositivo_id': 'unknown',
+      };
     }
-
-    return {
-      'dispositivo_tipo': tipo,
-      'dispositivo_modelo': modelo,
-      'dispositivo_id': id,
-    };
   }
 
   // =========================================================
@@ -206,48 +219,10 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _contactSupport() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Soporte Zuviro',
-          style: TextStyle(color: AppTheme.textMain),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '¿Necesitas ayuda? Contáctanos:',
-              style: TextStyle(color: AppTheme.textMuted),
-            ),
-            const SizedBox(height: 16),
-            _SupportOption(
-              icon: Icons.email_outlined,
-              label: 'soporte@zuviro.cl',
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            const SizedBox(height: 12),
-            _SupportOption(
-              icon: Icons.phone_outlined,
-              label: '+56 9 1234 5678',
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
+    // Ahora navega a la pantalla de soporte en lugar de mostrar un diálogo
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SupportScreen()),
     );
   }
 
@@ -266,6 +241,7 @@ class _LoginScreenState extends State<LoginScreen>
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Form(
               key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 children: [
                   const SizedBox(height: 48),
@@ -304,16 +280,10 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildLogo() {
     return Column(
       children: [
-        // Logo SVG personalizado
         SvgPicture.asset(
           'assets/mapa_demo_actualizado.svg',
           width: 120,
           height: 120,
-          // Si tu SVG ya tiene colores, quita esta línea:
-          // colorFilter: const ColorFilter.mode(
-          //   AppTheme.primary,
-          //   BlendMode.srcIn,
-          // ),
         ),
         const SizedBox(height: 24),
         const Text(
@@ -638,42 +608,6 @@ class _RoleOption extends StatelessWidget {
               Icons.arrow_forward_ios,
               color: AppTheme.textMuted,
               size: 16,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SupportOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _SupportOption({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        child: Row(
-          children: [
-            Icon(icon, color: AppTheme.primary, size: 20),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppTheme.textMain,
-                fontSize: 14,
-              ),
             ),
           ],
         ),
