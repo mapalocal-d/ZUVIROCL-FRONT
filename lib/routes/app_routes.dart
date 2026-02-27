@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../screens/splash_screen.dart';
 import '../screens/login_screen.dart';
+import '../screens/register_pasajero_screen.dart'; // ← AGREGADO
+import '../screens/register_conductor_screen.dart'; // ← AGREGADO
+// Opcional: importar soporte y legales si quieres rutas directas
+// import '../screens/support_screen.dart';
+// import '../screens/terms_screen.dart';
+// import '../screens/privacy_screen.dart';
 import '../theme/app_theme.dart';
 
 /// Centralizamos los nombres de las rutas para evitar errores de tipeo.
@@ -20,6 +26,10 @@ class AppRoutes {
   static const String perfilConductor = '/perfil/conductor';
   static const String cambiarContrasena = '/perfil/cambiar-contrasena';
   static const String sesionesActivas = '/perfil/sesiones';
+  // Opcionales
+  // static const String soporte = '/soporte';
+  // static const String terminos = '/terminos';
+  // static const String privacidad = '/privacidad';
 }
 
 /// Generador de rutas que conecta pantallas a medida que se crean.
@@ -34,15 +44,15 @@ class RouteGenerator {
             const _PlaceholderScreen('Seleccionar Rol'), settings);
 
       case AppRoutes.login:
-        return _buildRoute(const LoginScreen(), settings); // ← CONECTADO
+        return _buildRoute(const LoginScreen(), settings);
 
       case AppRoutes.registerPasajero:
         return _buildRoute(
-            const _PlaceholderScreen('Registro Pasajero'), settings);
+            const RegisterPasajeroScreen(), settings); // ← AHORA REAL
 
       case AppRoutes.registerConductor:
         return _buildRoute(
-            const _PlaceholderScreen('Registro Conductor'), settings);
+            const RegisterConductorScreen(), settings); // ← AHORA REAL
 
       case AppRoutes.recuperarContrasena:
         return _buildRoute(
@@ -78,6 +88,14 @@ class RouteGenerator {
       case AppRoutes.sesionesActivas:
         return _buildRoute(
             const _PlaceholderScreen('Sesiones Activas'), settings);
+
+      // Opcionales (si decides usarlos)
+      // case AppRoutes.soporte:
+      //   return _buildRoute(const SupportScreen(), settings);
+      // case AppRoutes.terminos:
+      //   return _buildRoute(const TermsScreen(), settings);
+      // case AppRoutes.privacidad:
+      //   return _buildRoute(const PrivacyScreen(), settings);
 
       default:
         return _buildRoute(
