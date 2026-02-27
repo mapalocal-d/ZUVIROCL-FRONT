@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../screens/splash_screen.dart';
 import '../screens/login_screen.dart';
-import '../screens/register_pasajero_screen.dart'; // ← AGREGADO
-import '../screens/register_conductor_screen.dart'; // ← AGREGADO
-// Opcional: importar soporte y legales si quieres rutas directas
+import '../screens/register_pasajero_screen.dart';
+import '../screens/register_conductor_screen.dart';
+import '../screens/recovery_request_screen.dart'; // <-- AGREGADO
+// import '../screens/recovery_confirm_screen.dart'; // Opcional (si se necesita ruta)
 // import '../screens/support_screen.dart';
 // import '../screens/terms_screen.dart';
 // import '../screens/privacy_screen.dart';
@@ -47,16 +48,14 @@ class RouteGenerator {
         return _buildRoute(const LoginScreen(), settings);
 
       case AppRoutes.registerPasajero:
-        return _buildRoute(
-            const RegisterPasajeroScreen(), settings); // ← AHORA REAL
+        return _buildRoute(const RegisterPasajeroScreen(), settings);
 
       case AppRoutes.registerConductor:
-        return _buildRoute(
-            const RegisterConductorScreen(), settings); // ← AHORA REAL
+        return _buildRoute(const RegisterConductorScreen(), settings);
 
       case AppRoutes.recuperarContrasena:
         return _buildRoute(
-            const _PlaceholderScreen('Recuperar Contraseña'), settings);
+            const RecoveryRequestScreen(), settings); // <-- AHORA REAL
 
       case AppRoutes.dashboardPasajero:
         return _buildRoute(const _PlaceholderScreen('Mapa Pasajero'), settings);
